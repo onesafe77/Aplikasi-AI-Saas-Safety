@@ -52,9 +52,9 @@ export async function generateEmbedding(text) {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     const result = await ai.models.embedContent({
       model: 'text-embedding-004',
-      content: text,
+      contents: [{ parts: [{ text }] }],
     });
-    return result.embedding.values;
+    return result.embeddings[0].values;
   } catch (error) {
     console.error('Embedding error:', error);
     return Array.from({ length: 768 }, () => Math.random());
