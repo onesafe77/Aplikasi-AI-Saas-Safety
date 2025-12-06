@@ -20,22 +20,25 @@ Si Asef is an AI-powered safety assistant that helps answer questions about Indo
 ```
 .
 ├── components/           # React components
-│   ├── AdminDashboard.tsx
-│   ├── ChatBubble.tsx
+│   ├── AdminDashboard.tsx  # Document upload/delete management
+│   ├── ChatBubble.tsx      # Message display with citation parsing
+│   ├── CitationBubble.tsx  # Green bubble badges for source references
 │   ├── InputArea.tsx
 │   ├── LandingPage.tsx
 │   ├── Login.tsx
 │   ├── Modals.tsx
 │   └── Sidebar.tsx
 ├── server/              # Backend server
-│   └── index.js        # Express server with Gemini API proxy
+│   ├── index.js         # Express server with all API endpoints
+│   ├── database.js      # PostgreSQL operations for documents/chunks
+│   └── rag.js           # Chunking, embeddings, semantic search
 ├── services/            # Frontend services
-│   └── gemini.ts       # API client for backend
-├── App.tsx             # Main application component
-├── index.tsx           # Application entry point
-├── types.ts            # TypeScript type definitions
-├── vite.config.ts      # Vite configuration with API proxy
-└── package.json        # Dependencies and scripts
+│   └── gemini.ts        # API client with SSE streaming
+├── App.tsx              # Main application with document/chat integration
+├── index.tsx            # Application entry point
+├── types.ts             # TypeScript type definitions
+├── vite.config.ts       # Vite configuration with API proxy
+└── package.json         # Dependencies and scripts
 ```
 
 ### Security Architecture
@@ -90,9 +93,14 @@ This project is configured for autoscale deployment on Replit:
 ## Key Features
 - Real-time chat interface with AI assistant
 - Indonesian K3 regulations expertise
-- Admin dashboard for management
+- **RAG System**: Document-based retrieval augmented generation
+  - Upload PDF, Word, or TXT documents
+  - Automatic text chunking and embedding generation
+  - Semantic search for relevant document passages
+  - Inline citations with clickable green bubble badges
+- Admin dashboard for document management (upload/delete)
 - User authentication system
-- Markdown-formatted responses
+- Markdown-formatted responses with source attribution
 - Sidebar navigation
 
 ## User Preferences
