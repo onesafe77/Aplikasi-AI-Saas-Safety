@@ -11,7 +11,8 @@ Si Asef is an AI-powered safety assistant that helps answer questions about Indo
 - **Frontend Framework**: React 19.2.1
 - **Language**: TypeScript 5.8.2
 - **Build Tool**: Vite 6.2.0
-- **AI Service**: Google Gemini AI via @google/genai
+- **Backend**: Express.js (Node.js)
+- **AI Service**: Google Gemini AI via @google/genai (server-side, API key secured)
 - **UI Components**: Custom components with Lucide React icons
 - **Markdown Rendering**: react-markdown for formatted responses
 
@@ -26,14 +27,23 @@ Si Asef is an AI-powered safety assistant that helps answer questions about Indo
 │   ├── Login.tsx
 │   ├── Modals.tsx
 │   └── Sidebar.tsx
-├── services/            # API services
-│   └── gemini.ts       # Gemini AI integration
+├── server/              # Backend server
+│   └── index.js        # Express server with Gemini API proxy
+├── services/            # Frontend services
+│   └── gemini.ts       # API client for backend
 ├── App.tsx             # Main application component
 ├── index.tsx           # Application entry point
 ├── types.ts            # TypeScript type definitions
-├── vite.config.ts      # Vite configuration
+├── vite.config.ts      # Vite configuration with API proxy
 └── package.json        # Dependencies and scripts
 ```
+
+### Security Architecture
+The application uses a secure backend proxy pattern:
+- Frontend makes requests to `/api/chat` endpoint
+- Backend server (port 3001) handles Gemini API calls with the secure API key
+- API key is never exposed to the client
+- Vite dev server proxies `/api` requests to the backend
 
 ## Recent Changes (December 6, 2025)
 1. Configured Vite server for Replit environment (port 5000, allowedHosts: true)
@@ -72,10 +82,10 @@ npm run preview
 ```
 
 ## Deployment
-This project is configured for static deployment on Replit:
+This project is configured for autoscale deployment on Replit:
 - **Build Command**: `npm run build`
-- **Public Directory**: `dist`
-- **Deployment Type**: Static (client-side only)
+- **Run Command**: `node server/index.js`
+- **Deployment Type**: Autoscale (requires backend for AI API calls)
 
 ## Key Features
 - Real-time chat interface with AI assistant
