@@ -8,7 +8,8 @@ import fs from 'fs';
 import mammoth from 'mammoth';
 
 const require = createRequire(import.meta.url);
-const pdfParse = require('pdf-parse');
+const pdfParseModule = require('pdf-parse');
+const pdfParse = pdfParseModule.default || pdfParseModule;
 import { GoogleGenAI } from '@google/genai';
 import { 
   initDatabase, 
