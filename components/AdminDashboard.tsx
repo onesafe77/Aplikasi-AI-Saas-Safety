@@ -107,6 +107,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ documents, onUpload, on
                 className="hidden" 
                 accept=".txt,.md,.pdf,.doc,.docx"
                 disabled={isUploading}
+                onChange={handleFileSelect}
             />
             <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-4 shadow-sm ${isUploading ? 'bg-emerald-200 text-emerald-700' : 'bg-emerald-100 text-emerald-600'}`}>
                 {isUploading ? <Loader2 className="w-8 h-8 animate-spin" /> : <UploadCloud className="w-8 h-8" />}
