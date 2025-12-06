@@ -2,7 +2,27 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import multer from 'multer';
+import fs from 'fs';
+import pdfParse from 'pdf-parse';
+import mammoth from 'mammoth';
 import { GoogleGenAI } from '@google/genai';
+import { 
+  initDatabase, 
+  insertDocument, 
+  insertChunk, 
+  updateDocumentChunkCount,
+  getAllDocuments, 
+  deleteDocument,
+  getAllChunks,
+  getChunksByIds 
+} from './database.js';
+import { 
+  chunkText, 
+  generateEmbedding, 
+  searchSimilarChunks, 
+  buildRAGPrompt 
+} from './rag.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -11,7 +31,14 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '50mb' }));
+
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 }
+});
+
+initDatabase().catch(console.error);
 
 const BASE_INSTRUCTION = `
 You are **Si Asef**, an intelligent and professional **Safety Assistant (Asisten K3)** specialized in Indonesian Safety Regulations.
@@ -20,35 +47,131 @@ You are **Si Asef**, an intelligent and professional **Safety Assistant (Asisten
 1. **UU No. 1 Tahun 1970** (Keselamatan Kerja)
 2. **PP No. 50 Tahun 2012** (SMK3)
 3. **Permenaker** related to K3.
-4. **Internal Documents:** The user may provide specific internal documents (context below).
+4. **Internal Documents:** Referenced documents from the knowledge base.
 
 **INSTRUCTIONS:**
-1. **Prioritize Uploaded Documents:** If the user asks about internal matters and documents are provided below, answer primarily from there. Cite the file name like this: **[Sumber: namafile.pdf]**.
-2. **General Regulations:** If the answer is not in the uploaded documents, use your general knowledge of Indonesian K3 laws. Cite specific articles (Pasal/Ayat) if possible.
+1. **Use Document References:** When answering, cite sources using {{ref:N}} format where N is the source number.
+2. **Be Specific:** Quote relevant parts from documents.
 3. **Tone:** Professional, Helpful, authoritative but friendly.
 4. **Language:** Indonesian (Bahasa Indonesia).
-
-**UPLOADED DOCUMENTS CONTEXT:**
 `;
-
-const formatDocuments = (docs) => {
-  if (!docs || docs.length === 0) return "No internal documents uploaded yet.";
-  
-  return docs.map(doc => `
---- BEGIN SOURCE: ${doc.name} ---
-${doc.content.substring(0, 20000)}
---- END SOURCE: ${doc.name} ---
-  `).join('\n');
-};
 
 const chatSessions = new Map();
 
+app.post('/api/documents/upload', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const { originalname, mimetype, size, buffer } = req.file;
+    let textContent = '';
+    let pageCount = 1;
+
+    if (mimetype === 'application/pdf') {
+      const pdfData = await pdfParse(buffer);
+      textContent = pdfData.text;
+      pageCount = pdfData.numpages || 1;
+    } else if (mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 
+               mimetype === 'application/msword') {
+      const result = await mammoth.extractRawText({ buffer });
+      textContent = result.value;
+    } else if (mimetype === 'text/plain') {
+      textContent = buffer.toString('utf-8');
+    } else {
+      return res.status(400).json({ error: 'Unsupported file type. Use PDF, DOCX, or TXT.' });
+    }
+
+    if (!textContent.trim()) {
+      return res.status(400).json({ error: 'Could not extract text from file' });
+    }
+
+    const fileSize = size < 1024 ? `${size} B` : 
+                     size < 1024 * 1024 ? `${(size / 1024).toFixed(1)} KB` : 
+                     `${(size / (1024 * 1024)).toFixed(1)} MB`;
+
+    const docId = await insertDocument(
+      originalname,
+      originalname,
+      mimetype,
+      fileSize,
+      pageCount
+    );
+
+    const chunks = chunkText(textContent, 1);
+    
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      const embedding = await generateEmbedding(chunk.content);
+      
+      await insertChunk(
+        docId,
+        i,
+        chunk.content,
+        chunk.pageNumber,
+        chunk.startPosition,
+        chunk.endPosition,
+        embedding
+      );
+    }
+
+    await updateDocumentChunkCount(docId, chunks.length);
+
+    res.json({ 
+      success: true, 
+      documentId: docId,
+      fileName: originalname,
+      chunks: chunks.length,
+      pages: pageCount
+    });
+
+  } catch (error) {
+    console.error('Upload error:', error);
+    res.status(500).json({ error: 'Failed to process document' });
+  }
+});
+
+app.get('/api/documents', async (req, res) => {
+  try {
+    const documents = await getAllDocuments();
+    res.json(documents);
+  } catch (error) {
+    console.error('Get documents error:', error);
+    res.status(500).json({ error: 'Failed to get documents' });
+  }
+});
+
+app.delete('/api/documents/:id', async (req, res) => {
+  try {
+    await deleteDocument(req.params.id);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete error:', error);
+    res.status(500).json({ error: 'Failed to delete document' });
+  }
+});
+
 app.post('/api/chat', async (req, res) => {
   try {
-    const { message, sessionId, documents } = req.body;
+    const { message, sessionId } = req.body;
     
     if (!process.env.GEMINI_API_KEY) {
       return res.status(500).json({ error: 'API key not configured' });
+    }
+
+    const allChunks = await getAllChunks();
+    let sources = [];
+    let augmentedPrompt = message;
+
+    if (allChunks.length > 0) {
+      const queryEmbedding = await generateEmbedding(message);
+      const relevantChunks = await searchSimilarChunks(queryEmbedding, allChunks, 5);
+      
+      if (relevantChunks.length > 0) {
+        const ragResult = buildRAGPrompt(message, relevantChunks);
+        augmentedPrompt = ragResult.prompt;
+        sources = ragResult.sources;
+      }
     }
 
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
@@ -56,13 +179,10 @@ app.post('/api/chat', async (req, res) => {
     let chatSession = chatSessions.get(sessionId);
     
     if (!chatSession) {
-      const context = formatDocuments(documents);
-      const fullSystemInstruction = `${BASE_INSTRUCTION}\n${context}`;
-      
       chatSession = await ai.chats.create({
         model: 'gemini-2.5-flash',
         config: {
-          systemInstruction: fullSystemInstruction,
+          systemInstruction: BASE_INSTRUCTION,
           temperature: 0.3,
         },
       });
@@ -73,7 +193,9 @@ app.post('/api/chat', async (req, res) => {
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
 
-    const resultStream = await chatSession.sendMessageStream({ message });
+    res.write(`data: ${JSON.stringify({ sources })}\n\n`);
+
+    const resultStream = await chatSession.sendMessageStream({ message: augmentedPrompt });
 
     for await (const chunk of resultStream) {
       const text = typeof chunk.text === 'function' ? chunk.text() : chunk.text;
@@ -86,7 +208,7 @@ app.post('/api/chat', async (req, res) => {
     res.end();
     
   } catch (error) {
-    console.error('Gemini API error:', error);
+    console.error('Chat error:', error);
     if (!res.headersSent) {
       res.status(500).json({ error: 'Failed to communicate with AI service' });
     } else {
@@ -105,7 +227,11 @@ app.post('/api/chat/reset', (req, res) => {
 });
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', hasApiKey: !!process.env.GEMINI_API_KEY });
+  res.json({ 
+    status: 'ok', 
+    hasApiKey: !!process.env.GEMINI_API_KEY,
+    hasDatabase: !!process.env.DATABASE_URL
+  });
 });
 
 const distPath = path.join(__dirname, '..', 'dist');

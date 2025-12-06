@@ -3,12 +3,22 @@ export enum Role {
   MODEL = 'model',
 }
 
+export interface Source {
+  id: number;
+  chunkId: number;
+  documentName: string;
+  pageNumber: number;
+  content: string;
+  score: number;
+}
+
 export interface Message {
   id: string;
   role: Role;
   content: string;
   timestamp: number;
   isStreaming?: boolean;
+  sources?: Source[];
 }
 
 export interface ChatSession {

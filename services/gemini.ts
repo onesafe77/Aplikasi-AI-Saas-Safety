@@ -1,7 +1,20 @@
 import { UploadedDocument } from '../types';
 
+export interface Source {
+  id: number;
+  chunkId: number;
+  documentName: string;
+  pageNumber: number;
+  content: string;
+  score: number;
+}
+
+export interface ChatResponse {
+  text: string;
+  sources: Source[];
+}
+
 let sessionId: string | null = null;
-let currentDocuments: UploadedDocument[] = [];
 
 const getApiUrl = (): string => {
   if (typeof window !== 'undefined') {
@@ -12,11 +25,9 @@ const getApiUrl = (): string => {
 
 export const initializeChat = (documents: UploadedDocument[] = []) => {
   sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  currentDocuments = documents;
 };
 
 export const updateChatContext = async (documents: UploadedDocument[]) => {
-  currentDocuments = documents;
   if (sessionId) {
     try {
       await fetch(`${getApiUrl()}/api/chat/reset`, {
@@ -33,7 +44,8 @@ export const updateChatContext = async (documents: UploadedDocument[]) => {
 
 export const sendMessageToGemini = async (
   content: string, 
-  onChunk: (text: string) => void
+  onChunk: (text: string) => void,
+  onSources?: (sources: Source[]) => void
 ): Promise<void> => {
   if (!sessionId) {
     initializeChat();
@@ -45,7 +57,6 @@ export const sendMessageToGemini = async (
     body: JSON.stringify({
       message: content,
       sessionId,
-      documents: currentDocuments,
     }),
   });
 
@@ -60,6 +71,7 @@ export const sendMessageToGemini = async (
   }
 
   const decoder = new TextDecoder();
+  let sourcesReceived = false;
   
   while (true) {
     const { done, value } = await reader.read();
@@ -76,6 +88,12 @@ export const sendMessageToGemini = async (
         }
         try {
           const parsed = JSON.parse(data);
+          if (parsed.sources && !sourcesReceived) {
+            sourcesReceived = true;
+            if (onSources) {
+              onSources(parsed.sources);
+            }
+          }
           if (parsed.text) {
             onChunk(parsed.text);
           }
@@ -86,5 +104,50 @@ export const sendMessageToGemini = async (
         }
       }
     }
+  }
+};
+
+export const uploadDocument = async (file: File): Promise<{ success: boolean; documentId?: number; error?: string }> => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    const response = await fetch(`${getApiUrl()}/api/documents/upload`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    const result = await response.json();
+    
+    if (!response.ok) {
+      return { success: false, error: result.error };
+    }
+
+    return { success: true, documentId: result.documentId };
+  } catch (error) {
+    return { success: false, error: 'Failed to upload document' };
+  }
+};
+
+export const getDocuments = async () => {
+  try {
+    const response = await fetch(`${getApiUrl()}/api/documents`);
+    if (!response.ok) throw new Error('Failed to fetch documents');
+    return await response.json();
+  } catch (error) {
+    console.error('Get documents error:', error);
+    return [];
+  }
+};
+
+export const deleteDocumentApi = async (id: number) => {
+  try {
+    const response = await fetch(`${getApiUrl()}/api/documents/${id}`, {
+      method: 'DELETE',
+    });
+    return response.ok;
+  } catch (error) {
+    console.error('Delete document error:', error);
+    return false;
   }
 };
