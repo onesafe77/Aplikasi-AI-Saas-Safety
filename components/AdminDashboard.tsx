@@ -1,16 +1,18 @@
 import React, { useState, useRef } from 'react';
-import { UploadCloud, FileText, Trash2, Search, ArrowLeft, CheckCircle2, Database, AlertCircle, FileType, HardDrive, LogOut } from 'lucide-react';
+import { UploadCloud, FileText, Trash2, Search, ArrowLeft, CheckCircle2, Database, AlertCircle, FileType, HardDrive, LogOut, Loader2 } from 'lucide-react';
 import { UploadedDocument } from '../types';
 
 interface AdminDashboardProps {
   documents: UploadedDocument[];
-  onUpload: (file: File) => void;
-  onDelete: (id: string) => void;
+  onUpload: (file: File) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
   onLogout: () => void;
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ documents, onUpload, onDelete, onLogout }) => {
   const [isDragging, setIsDragging] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -22,17 +24,42 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ documents, onUpload, on
     setIsDragging(false);
   };
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      onUpload(e.dataTransfer.files[0]);
+      setIsUploading(true);
+      try {
+        await onUpload(e.dataTransfer.files[0]);
+      } catch (error) {
+        console.error('Upload failed:', error);
+      } finally {
+        setIsUploading(false);
+      }
     }
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      onUpload(e.target.files[0]);
+      setIsUploading(true);
+      try {
+        await onUpload(e.target.files[0]);
+      } catch (error) {
+        console.error('Upload failed:', error);
+      } finally {
+        setIsUploading(false);
+      }
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    setDeletingId(id);
+    try {
+      await onDelete(id);
+    } catch (error) {
+      console.error('Delete failed:', error);
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -66,29 +93,35 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ documents, onUpload, on
         {/* Upload Area */}
         <div 
             className={`
-                mb-10 border-2 border-dashed rounded-3xl p-10 flex flex-col items-center justify-center text-center transition-all cursor-pointer
-                ${isDragging ? 'border-emerald-500 bg-emerald-50 scale-[1.01]' : 'border-zinc-300 bg-white hover:border-emerald-400 hover:bg-zinc-50'}
+                mb-10 border-2 border-dashed rounded-3xl p-10 flex flex-col items-center justify-center text-center transition-all
+                ${isUploading ? 'border-emerald-500 bg-emerald-50 cursor-wait' : isDragging ? 'border-emerald-500 bg-emerald-50 scale-[1.01] cursor-pointer' : 'border-zinc-300 bg-white hover:border-emerald-400 hover:bg-zinc-50 cursor-pointer'}
             `}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => !isUploading && fileInputRef.current?.click()}
         >
             <input 
                 type="file" 
                 ref={fileInputRef} 
                 className="hidden" 
-                accept=".txt,.md,.pdf,.doc,.docx" // Note: Frontend demo handles txt best, but UI allows others
+                accept=".txt,.md,.pdf,.doc,.docx"
+                disabled={isUploading}
             />
-            <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mb-4 shadow-sm">
-                <UploadCloud className="w-8 h-8" />
+            <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-4 shadow-sm ${isUploading ? 'bg-emerald-200 text-emerald-700' : 'bg-emerald-100 text-emerald-600'}`}>
+                {isUploading ? <Loader2 className="w-8 h-8 animate-spin" /> : <UploadCloud className="w-8 h-8" />}
             </div>
-            <h3 className="text-xl font-bold text-zinc-800 mb-2">Upload Dokumen Baru</h3>
+            <h3 className="text-xl font-bold text-zinc-800 mb-2">
+                {isUploading ? 'Mengupload Dokumen...' : 'Upload Dokumen Baru'}
+            </h3>
             <p className="text-zinc-500 max-w-md mb-6">
-                Drag & drop file PDF, Word, atau TXT di sini. Si Asef akan otomatis membaca dan mempelajarinya sebagai referensi.
+                {isUploading ? 'Sedang memproses dan mengindeks dokumen. Mohon tunggu...' : 'Drag & drop file PDF, Word, atau TXT di sini. Si Asef akan otomatis membaca dan mempelajarinya sebagai referensi.'}
             </p>
-            <button className="px-6 py-2.5 bg-zinc-900 text-white rounded-xl font-bold text-sm hover:bg-emerald-600 transition-colors shadow-lg shadow-zinc-900/10">
-                Pilih File dari Komputer
+            <button 
+                className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-colors shadow-lg shadow-zinc-900/10 ${isUploading ? 'bg-zinc-400 text-white cursor-not-allowed' : 'bg-zinc-900 text-white hover:bg-emerald-600'}`}
+                disabled={isUploading}
+            >
+                {isUploading ? 'Mengupload...' : 'Pilih File dari Komputer'}
             </button>
         </div>
 
@@ -158,11 +191,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ documents, onUpload, on
                                 </td>
                                 <td className="px-8 py-4 text-right">
                                     <button 
-                                        onClick={() => onDelete(doc.id)}
-                                        className="p-2 text-zinc-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                        onClick={() => handleDelete(doc.id)}
+                                        className={`p-2 rounded-lg transition-colors ${deletingId === doc.id ? 'text-red-400 cursor-wait' : 'text-zinc-400 hover:text-red-500 hover:bg-red-50'}`}
                                         title="Hapus Dokumen"
+                                        disabled={deletingId === doc.id}
                                     >
-                                        <Trash2 className="w-4 h-4" />
+                                        {deletingId === doc.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                                     </button>
                                 </td>
                             </tr>

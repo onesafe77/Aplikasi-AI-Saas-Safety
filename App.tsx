@@ -7,8 +7,8 @@ import LandingPage from './components/LandingPage';
 import Login from './components/Login';
 import AdminDashboard from './components/AdminDashboard';
 import { UpgradeModal, SettingsModal } from './components/Modals';
-import { Message, Role, ChatSession, LoadingState, User, UploadedDocument, ViewState } from './types';
-import { sendMessageToGemini, initializeChat, updateChatContext } from './services/gemini';
+import { Message, Role, ChatSession, LoadingState, User, UploadedDocument, ViewState, Source } from './types';
+import { sendMessageToGemini, initializeChat, updateChatContext, uploadDocument, getDocuments, deleteDocumentApi } from './services/gemini';
 
 const SAMPLE_SESSIONS: ChatSession[] = [
   { id: '1', title: 'Analisa Regulasi Internal', date: 'Today' },
@@ -59,6 +59,26 @@ function App() {
       }
   }, [documents, currentView]);
 
+  // Load documents from database on mount
+  useEffect(() => {
+    const loadDocuments = async () => {
+      try {
+        const docs = await getDocuments();
+        setDocuments(docs.map((d: any) => ({
+          id: d.id.toString(),
+          name: d.filename,
+          type: d.file_type,
+          content: '',
+          uploadDate: new Date(d.created_at).getTime(),
+          size: `${(d.file_size / 1024).toFixed(1)} KB`
+        })));
+      } catch (error) {
+        console.error('Failed to load documents:', error);
+      }
+    };
+    loadDocuments();
+  }, []);
+
   const scrollToBottom = () => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -97,23 +117,29 @@ function App() {
   };
 
   const handleDocumentUpload = async (file: File) => {
-    const text = await file.text();
-    const fileSize = (file.size / 1024).toFixed(1) + ' KB';
-    
-    const newDoc: UploadedDocument = {
-        id: Date.now().toString(),
-        name: file.name,
-        type: file.type || 'text/plain',
-        content: text,
-        uploadDate: Date.now(),
-        size: fileSize
-    };
-
-    setDocuments(prev => [...prev, newDoc]);
+    const result = await uploadDocument(file);
+    if (result.success) {
+      const docs = await getDocuments();
+      setDocuments(docs.map((d: any) => ({
+        id: d.id.toString(),
+        name: d.filename,
+        type: d.file_type,
+        content: '',
+        uploadDate: new Date(d.created_at).getTime(),
+        size: `${(d.file_size / 1024).toFixed(1)} KB`
+      })));
+    } else {
+      throw new Error(result.error || 'Upload failed');
+    }
   };
 
-  const handleDeleteDocument = (id: string) => {
+  const handleDeleteDocument = async (id: string) => {
+    const success = await deleteDocumentApi(parseInt(id));
+    if (success) {
       setDocuments(prev => prev.filter(d => d.id !== id));
+    } else {
+      throw new Error('Failed to delete document');
+    }
   };
 
   const handleSendMessage = async (text: string, image?: string) => {
@@ -143,19 +169,25 @@ function App() {
     try {
       let accumulatedText = '';
       const promptToSend = image ? `[User uploaded an image] ${text}` : text;
+      let messageSources: Source[] = [];
 
-      await sendMessageToGemini(promptToSend, (chunk) => {
-        accumulatedText += chunk;
-        setMessages(prev => prev.map(msg => 
-          msg.id === aiMsgId 
-            ? { ...msg, content: accumulatedText }
-            : msg
-        ));
-      });
+      await sendMessageToGemini(promptToSend, 
+        (chunk) => {
+          accumulatedText += chunk;
+          setMessages(prev => prev.map(msg => 
+            msg.id === aiMsgId 
+              ? { ...msg, content: accumulatedText, sources: messageSources }
+              : msg
+          ));
+        },
+        (sources) => {
+          messageSources = sources;
+        }
+      );
       
       setMessages(prev => prev.map(msg => 
         msg.id === aiMsgId 
-          ? { ...msg, isStreaming: false }
+          ? { ...msg, isStreaming: false, sources: messageSources }
           : msg
       ));
       setLoadingState('idle');

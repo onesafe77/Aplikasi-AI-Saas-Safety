@@ -1,11 +1,14 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
+import { createRequire } from 'module';
 import multer from 'multer';
 import fs from 'fs';
-import pdfParse from 'pdf-parse';
 import mammoth from 'mammoth';
+
+const require = createRequire(import.meta.url);
+const pdfParse = require('pdf-parse');
 import { GoogleGenAI } from '@google/genai';
 import { 
   initDatabase, 
