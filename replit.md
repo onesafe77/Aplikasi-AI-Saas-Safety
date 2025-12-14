@@ -49,10 +49,20 @@ The application uses a secure backend proxy pattern:
 - Vite dev server proxies `/api` requests to the backend
 
 ## Recent Changes (December 14, 2025)
-1. Fixed pdf-parse import using dynamic import for ESM compatibility
-2. Added upload progress bar with percentage indicator
-3. Added success/error notifications after upload completes
-4. Improved file upload UX with real-time progress tracking
+1. **Citation Improvements**: AI now uses citations sparingly at end of sentences/paragraphs
+2. **Citation Badge Styling**: Smaller, superscript-style badges that don't disrupt reading
+3. **Regulasi Spotlight Section**: New animated section on landing page with quote display
+4. **Dynamic Spotlight Content**: Spotlight fetches random quotes from uploaded documents
+5. **Chat History Feature**: Full conversation persistence with database storage
+   - Chat sessions saved to PostgreSQL (chat_sessions, chat_messages tables)
+   - View and continue previous conversations from sidebar
+   - Session titles auto-generated from first message
+
+### Previous Changes
+- Fixed pdf-parse import using dynamic import for ESM compatibility
+- Added upload progress bar with percentage indicator
+- Added success/error notifications after upload completes
+- Improved file upload UX with real-time progress tracking
 
 ## Previous Changes (December 6, 2025)
 1. Configured Vite server for Replit environment (port 5000, allowedHosts: true)
