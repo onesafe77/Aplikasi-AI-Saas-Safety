@@ -48,7 +48,13 @@ The application uses a secure backend proxy pattern:
 - API key is never exposed to the client
 - Vite dev server proxies `/api` requests to the backend
 
-## Recent Changes (December 6, 2025)
+## Recent Changes (December 14, 2025)
+1. Fixed pdf-parse import to handle CommonJS module correctly
+2. Added upload progress bar with percentage indicator
+3. Added success/error notifications after upload completes
+4. Improved file upload UX with real-time progress tracking
+
+## Previous Changes (December 6, 2025)
 1. Configured Vite server for Replit environment (port 5000, allowedHosts: true)
 2. Set up GEMINI_API_KEY as a Replit secret
 3. Created workflow for development server
