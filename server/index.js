@@ -5,15 +5,7 @@ import { fileURLToPath } from 'url';
 import multer from 'multer';
 import fs from 'fs';
 import mammoth from 'mammoth';
-
-let pdfParse = null;
-async function loadPdfParse() {
-  if (!pdfParse) {
-    const module = await import('pdf-parse');
-    pdfParse = module.default;
-  }
-  return pdfParse;
-}
+import pdfParse from '@cyber2024/pdf-parse-fixed';
 import { GoogleGenAI } from '@google/genai';
 import { 
   initDatabase, 
@@ -77,8 +69,7 @@ app.post('/api/documents/upload', upload.single('file'), async (req, res) => {
     let pageCount = 1;
 
     if (mimetype === 'application/pdf') {
-      const parsePdf = await loadPdfParse();
-      const pdfData = await parsePdf(buffer);
+      const pdfData = await pdfParse(buffer);
       textContent = pdfData.text;
       pageCount = pdfData.numpages || 1;
     } else if (mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 

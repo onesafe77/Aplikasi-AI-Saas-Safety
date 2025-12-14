@@ -12,6 +12,7 @@
     "start": "node server/index.js"
   },
   "dependencies": {
+    "@cyber2024/pdf-parse-fixed": "^1.2.5",
     "@google/genai": "^1.31.0",
     "cors": "^2.8.5",
     "express": "^5.2.1",
