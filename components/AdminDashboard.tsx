@@ -4,7 +4,7 @@ import { UploadedDocument } from '../types';
 
 interface AdminDashboardProps {
   documents: UploadedDocument[];
-  onUpload: (file: File) => Promise<void>;
+  onUpload: (file: File, onProgress?: (percent: number) => void) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onLogout: () => void;
 }
@@ -12,6 +12,9 @@ interface AdminDashboardProps {
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ documents, onUpload, onDelete, onLogout }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -28,26 +31,47 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ documents, onUpload, on
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const fileName = e.dataTransfer.files[0].name;
       setIsUploading(true);
+      setUploadProgress(0);
+      setUploadSuccess(null);
+      setUploadError(null);
       try {
-        await onUpload(e.dataTransfer.files[0]);
-      } catch (error) {
+        await onUpload(e.dataTransfer.files[0], (percent) => setUploadProgress(percent));
+        setUploadSuccess(`File "${fileName}" berhasil diupload!`);
+        setTimeout(() => setUploadSuccess(null), 5000);
+      } catch (error: any) {
         console.error('Upload failed:', error);
+        setUploadError(error.message || 'Upload gagal');
+        setTimeout(() => setUploadError(null), 5000);
       } finally {
         setIsUploading(false);
+        setUploadProgress(0);
       }
     }
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
+      const fileName = e.target.files[0].name;
       setIsUploading(true);
+      setUploadProgress(0);
+      setUploadSuccess(null);
+      setUploadError(null);
       try {
-        await onUpload(e.target.files[0]);
-      } catch (error) {
+        await onUpload(e.target.files[0], (percent) => setUploadProgress(percent));
+        setUploadSuccess(`File "${fileName}" berhasil diupload!`);
+        setTimeout(() => setUploadSuccess(null), 5000);
+      } catch (error: any) {
         console.error('Upload failed:', error);
+        setUploadError(error.message || 'Upload gagal');
+        setTimeout(() => setUploadError(null), 5000);
       } finally {
         setIsUploading(false);
+        setUploadProgress(0);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
       }
     }
   };
@@ -113,18 +137,47 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ documents, onUpload, on
                 {isUploading ? <Loader2 className="w-8 h-8 animate-spin" /> : <UploadCloud className="w-8 h-8" />}
             </div>
             <h3 className="text-xl font-bold text-zinc-800 mb-2">
-                {isUploading ? 'Mengupload Dokumen...' : 'Upload Dokumen Baru'}
+                {isUploading ? `Mengupload Dokumen... ${uploadProgress}%` : 'Upload Dokumen Baru'}
             </h3>
-            <p className="text-zinc-500 max-w-md mb-6">
-                {isUploading ? 'Sedang memproses dan mengindeks dokumen. Mohon tunggu...' : 'Drag & drop file PDF, Word, atau TXT di sini. Si Asef akan otomatis membaca dan mempelajarinya sebagai referensi.'}
-            </p>
+            {isUploading && (
+                <div className="w-full max-w-md mb-4">
+                    <div className="h-3 bg-zinc-200 rounded-full overflow-hidden">
+                        <div 
+                            className="h-full bg-emerald-500 transition-all duration-300 ease-out"
+                            style={{ width: `${uploadProgress}%` }}
+                        />
+                    </div>
+                    <p className="text-sm text-emerald-600 font-medium mt-2">
+                        {uploadProgress < 100 ? 'Mengunggah file...' : 'Memproses dan mengindeks dokumen...'}
+                    </p>
+                </div>
+            )}
+            {!isUploading && (
+                <p className="text-zinc-500 max-w-md mb-6">
+                    Drag & drop file PDF, Word, atau TXT di sini. Si Asef akan otomatis membaca dan mempelajarinya sebagai referensi.
+                </p>
+            )}
             <button 
                 className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-colors shadow-lg shadow-zinc-900/10 ${isUploading ? 'bg-zinc-400 text-white cursor-not-allowed' : 'bg-zinc-900 text-white hover:bg-emerald-600'}`}
                 disabled={isUploading}
             >
-                {isUploading ? 'Mengupload...' : 'Pilih File dari Komputer'}
+                {isUploading ? `Mengupload... ${uploadProgress}%` : 'Pilih File dari Komputer'}
             </button>
         </div>
+
+        {/* Success/Error Notifications */}
+        {uploadSuccess && (
+            <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-3">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                <p className="text-emerald-700 font-medium">{uploadSuccess}</p>
+            </div>
+        )}
+        {uploadError && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3">
+                <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
+                <p className="text-red-700 font-medium">{uploadError}</p>
+            </div>
+        )}
 
         {/* Document List */}
         <div className="bg-white rounded-[2rem] border border-zinc-200 shadow-sm overflow-hidden">

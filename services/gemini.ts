@@ -107,26 +107,43 @@ export const sendMessageToGemini = async (
   }
 };
 
-export const uploadDocument = async (file: File): Promise<{ success: boolean; documentId?: number; error?: string }> => {
+export const uploadDocument = async (
+  file: File, 
+  onProgress?: (percent: number) => void
+): Promise<{ success: boolean; documentId?: number; error?: string }> => {
   const formData = new FormData();
   formData.append('file', file);
 
-  try {
-    const response = await fetch(`${getApiUrl()}/api/documents/upload`, {
-      method: 'POST',
-      body: formData,
+  return new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    
+    xhr.upload.addEventListener('progress', (event) => {
+      if (event.lengthComputable && onProgress) {
+        const percent = Math.round((event.loaded / event.total) * 100);
+        onProgress(percent);
+      }
     });
 
-    const result = await response.json();
-    
-    if (!response.ok) {
-      return { success: false, error: result.error };
-    }
+    xhr.addEventListener('load', () => {
+      try {
+        const result = JSON.parse(xhr.responseText);
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve({ success: true, documentId: result.documentId });
+        } else {
+          resolve({ success: false, error: result.error || 'Upload failed' });
+        }
+      } catch (e) {
+        resolve({ success: false, error: 'Failed to parse response' });
+      }
+    });
 
-    return { success: true, documentId: result.documentId };
-  } catch (error) {
-    return { success: false, error: 'Failed to upload document' };
-  }
+    xhr.addEventListener('error', () => {
+      resolve({ success: false, error: 'Network error during upload' });
+    });
+
+    xhr.open('POST', `${getApiUrl()}/api/documents/upload`);
+    xhr.send(formData);
+  });
 };
 
 export const getDocuments = async () => {

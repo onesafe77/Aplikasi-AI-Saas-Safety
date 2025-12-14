@@ -116,8 +116,8 @@ function App() {
       ]);
   };
 
-  const handleDocumentUpload = async (file: File) => {
-    const result = await uploadDocument(file);
+  const handleDocumentUpload = async (file: File, onProgress?: (percent: number) => void) => {
+    const result = await uploadDocument(file, onProgress);
     if (result.success) {
       const docs = await getDocuments();
       setDocuments(docs.map((d: any) => ({
@@ -126,7 +126,7 @@ function App() {
         type: d.file_type,
         content: '',
         uploadDate: new Date(d.created_at).getTime(),
-        size: `${(d.file_size / 1024).toFixed(1)} KB`
+        size: d.file_size
       })));
     } else {
       throw new Error(result.error || 'Upload failed');
