@@ -1,15 +1,19 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
-import { fileURLToPath, pathToFileURL } from 'url';
-import { createRequire } from 'module';
+import { fileURLToPath } from 'url';
 import multer from 'multer';
 import fs from 'fs';
 import mammoth from 'mammoth';
 
-const require = createRequire(import.meta.url);
-const pdfParseModule = require('pdf-parse');
-const pdfParse = pdfParseModule.default || pdfParseModule;
+let pdfParse = null;
+async function loadPdfParse() {
+  if (!pdfParse) {
+    const module = await import('pdf-parse');
+    pdfParse = module.default;
+  }
+  return pdfParse;
+}
 import { GoogleGenAI } from '@google/genai';
 import { 
   initDatabase, 
@@ -73,7 +77,8 @@ app.post('/api/documents/upload', upload.single('file'), async (req, res) => {
     let pageCount = 1;
 
     if (mimetype === 'application/pdf') {
-      const pdfData = await pdfParse(buffer);
+      const parsePdf = await loadPdfParse();
+      const pdfData = await parsePdf(buffer);
       textContent = pdfData.text;
       pageCount = pdfData.numpages || 1;
     } else if (mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 
