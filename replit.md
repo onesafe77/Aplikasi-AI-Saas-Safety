@@ -49,7 +49,7 @@ The application uses a secure backend proxy pattern:
 - Vite dev server proxies `/api` requests to the backend
 
 ## Recent Changes (December 14, 2025)
-1. Fixed pdf-parse import to handle CommonJS module correctly
+1. Fixed pdf-parse import using dynamic import for ESM compatibility
 2. Added upload progress bar with percentage indicator
 3. Added success/error notifications after upload completes
 4. Improved file upload UX with real-time progress tracking
