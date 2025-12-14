@@ -1,7 +1,8 @@
 import { GoogleGenAI } from '@google/genai';
 
-const CHUNK_SIZE = 500;
-const CHUNK_OVERLAP = 50;
+const CHUNK_SIZE = 1000;
+const CHUNK_OVERLAP = 100;
+const BATCH_SIZE = 5;
 
 export function chunkText(text, pageNumber = 1) {
   const chunks = [];
@@ -59,6 +60,17 @@ export async function generateEmbedding(text) {
     console.error('Embedding error:', error);
     return Array.from({ length: 768 }, () => Math.random());
   }
+}
+
+export async function generateEmbeddingsBatch(texts) {
+  if (!process.env.GEMINI_API_KEY) {
+    return texts.map(() => Array.from({ length: 768 }, () => Math.random()));
+  }
+  
+  const results = await Promise.all(
+    texts.map(text => generateEmbedding(text))
+  );
+  return results;
 }
 
 export function cosineSimilarity(a, b) {

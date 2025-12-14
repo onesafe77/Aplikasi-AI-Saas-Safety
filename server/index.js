@@ -19,7 +19,8 @@ import {
 } from './database.js';
 import { 
   chunkText, 
-  generateEmbedding, 
+  generateEmbedding,
+  generateEmbeddingsBatch,
   searchSimilarChunks, 
   buildRAGPrompt 
 } from './rag.js';
@@ -100,19 +101,25 @@ app.post('/api/documents/upload', upload.single('file'), async (req, res) => {
 
     const chunks = chunkText(textContent, 1);
     
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i];
-      const embedding = await generateEmbedding(chunk.content);
+    const BATCH_SIZE = 5;
+    for (let batchStart = 0; batchStart < chunks.length; batchStart += BATCH_SIZE) {
+      const batchChunks = chunks.slice(batchStart, batchStart + BATCH_SIZE);
+      const texts = batchChunks.map(c => c.content);
       
-      await insertChunk(
-        docId,
-        i,
-        chunk.content,
-        chunk.pageNumber,
-        chunk.startPosition,
-        chunk.endPosition,
-        embedding
-      );
+      const embeddings = await generateEmbeddingsBatch(texts);
+      
+      for (let idx = 0; idx < batchChunks.length; idx++) {
+        const chunk = batchChunks[idx];
+        await insertChunk(
+          docId,
+          batchStart + idx,
+          chunk.content,
+          chunk.pageNumber,
+          chunk.startPosition,
+          chunk.endPosition,
+          embeddings[idx]
+        );
+      }
     }
 
     await updateDocumentChunkCount(docId, chunks.length);

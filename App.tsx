@@ -66,11 +66,11 @@ function App() {
         const docs = await getDocuments();
         setDocuments(docs.map((d: any) => ({
           id: d.id.toString(),
-          name: d.filename,
+          name: d.name || d.original_name,
           type: d.file_type,
           content: '',
           uploadDate: new Date(d.created_at).getTime(),
-          size: `${(d.file_size / 1024).toFixed(1)} KB`
+          size: d.file_size
         })));
       } catch (error) {
         console.error('Failed to load documents:', error);
@@ -122,7 +122,7 @@ function App() {
       const docs = await getDocuments();
       setDocuments(docs.map((d: any) => ({
         id: d.id.toString(),
-        name: d.filename,
+        name: d.name || d.original_name,
         type: d.file_type,
         content: '',
         uploadDate: new Date(d.created_at).getTime(),
