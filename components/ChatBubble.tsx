@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { User, ShieldCheck, Copy, Check, RotateCcw, FileText, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Message, Role, Source } from '../types';
@@ -24,12 +24,12 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, onRegenerate, onOpenSo
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const renderContentWithCitations = (content: string, sources: Source[] = []) => {
-    if (!sources || sources.length === 0) {
-      return content;
+  const renderTextWithCitations = (text: string, sources: Source[] = []) => {
+    if (!sources || sources.length === 0 || !text.includes('{{ref:')) {
+      return text;
     }
 
-    const parts = content.split(/(\{\{ref:\d+\}\})/g);
+    const parts = text.split(/(\{\{ref:\d+\}\})/g);
     
     return parts.map((part, index) => {
       const match = part.match(/\{\{ref:(\d+)\}\}/);
@@ -37,7 +37,7 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, onRegenerate, onOpenSo
         const refNum = parseInt(match[1], 10);
         const source = sources.find(s => s.id === refNum);
         if (source) {
-          const sourceInfo = {
+          const sourceInfo: SourceInfo = {
             id: source.id,
             chunkId: source.chunkId,
             documentName: source.documentName,
@@ -47,21 +47,67 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, onRegenerate, onOpenSo
           };
           return (
             <CitationBubble 
-              key={index} 
+              key={`cite-${index}`} 
               number={refNum} 
               source={sourceInfo}
               onOpenPanel={onOpenSource}
             />
           );
         }
+        return null;
       }
       return part;
     });
   };
 
-  const getCleanContentForMarkdown = (content: string) => {
-    return content.replace(/\{\{ref:\d+\}\}/g, '');
-  };
+  const markdownComponents = useMemo(() => ({
+    h1: ({node, ...props}: any) => <h1 className="text-2xl font-bold text-zinc-900 mt-8 mb-4 font-sans tracking-tight" {...props} />,
+    h2: ({node, ...props}: any) => <h2 className="text-xl font-bold text-zinc-900 mt-6 mb-3 font-sans tracking-tight" {...props} />,
+    h3: ({node, ...props}: any) => <h3 className="text-lg font-bold text-zinc-900 mt-5 mb-2 font-sans tracking-tight" {...props} />,
+    p: ({node, children, ...props}: any) => (
+      <p className="mb-4 leading-7 text-zinc-800 font-serif text-[16px]" {...props}>
+        {React.Children.map(children, (child) => {
+          if (typeof child === 'string') {
+            return renderTextWithCitations(child, message.sources);
+          }
+          return child;
+        })}
+      </p>
+    ),
+    strong: ({node, children, ...props}: any) => (
+      <strong className="font-bold text-zinc-900" {...props}>
+        {React.Children.map(children, (child) => {
+          if (typeof child === 'string') {
+            return renderTextWithCitations(child, message.sources);
+          }
+          return child;
+        })}
+      </strong>
+    ),
+    em: ({node, children, ...props}: any) => (
+      <em className="italic" {...props}>
+        {React.Children.map(children, (child) => {
+          if (typeof child === 'string') {
+            return renderTextWithCitations(child, message.sources);
+          }
+          return child;
+        })}
+      </em>
+    ),
+    ul: ({node, ...props}: any) => <ul className="list-disc pl-5 mb-5 space-y-2 marker:text-zinc-400 font-serif leading-7" {...props} />,
+    ol: ({node, ...props}: any) => <ol className="list-decimal pl-5 mb-5 space-y-2 marker:text-zinc-500 font-serif leading-7" {...props} />,
+    li: ({node, children, ...props}: any) => (
+      <li className="pl-1" {...props}>
+        {React.Children.map(children, (child) => {
+          if (typeof child === 'string') {
+            return renderTextWithCitations(child, message.sources);
+          }
+          return child;
+        })}
+      </li>
+    ),
+    blockquote: ({node, ...props}: any) => <blockquote className="border-l-4 border-emerald-500/50 pl-4 italic text-zinc-600 my-5 bg-zinc-50/50 py-2 rounded-r-lg" {...props} />,
+  }), [message.sources, onOpenSource]);
 
   return (
     <div className={`w-full py-4 md:py-8 px-4 ${isUser ? '' : 'bg-transparent'}`}>
@@ -121,27 +167,9 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, onRegenerate, onOpenSo
 
                 {message.content && (
                     <div className="markdown-body font-serif text-[#2D2D2D]">
-                         {message.sources && message.sources.length > 0 ? (
-                           <div className="mb-5 leading-8 text-zinc-800 font-serif text-[16px]">
-                             {renderContentWithCitations(message.content, message.sources)}
-                           </div>
-                         ) : (
-                           <ReactMarkdown 
-                              components={{
-                                  h1: ({node, ...props}) => <h1 className="text-2xl font-bold text-zinc-900 mt-8 mb-4 font-sans tracking-tight" {...props} />,
-                                  h2: ({node, ...props}) => <h2 className="text-xl font-bold text-zinc-900 mt-8 mb-4 font-sans tracking-tight" {...props} />,
-                                  h3: ({node, ...props}) => <h3 className="text-lg font-bold text-zinc-900 mt-6 mb-3 font-sans tracking-tight" {...props} />,
-                                  p: ({node, ...props}) => <p className="mb-5 leading-8 text-zinc-800 font-serif text-[16px]" {...props} />,
-                                  strong: ({node, ...props}) => <strong className="font-bold text-zinc-900" {...props} />,
-                                  ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-6 space-y-2 marker:text-zinc-400 font-serif leading-7" {...props} />,
-                                  ol: ({node, ...props}) => <ol className="list-decimal pl-5 mb-6 space-y-2 marker:text-zinc-500 font-serif leading-7" {...props} />,
-                                  li: ({node, ...props}) => <li className="pl-1" {...props} />,
-                                  blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-emerald-500/50 pl-4 italic text-zinc-600 my-6 bg-zinc-50/50 py-2 rounded-r-lg" {...props} />,
-                              }}
-                          >
-                              {message.content}
-                          </ReactMarkdown>
-                         )}
+                      <ReactMarkdown components={markdownComponents}>
+                        {message.content}
+                      </ReactMarkdown>
                     </div>
                 )}
                 
