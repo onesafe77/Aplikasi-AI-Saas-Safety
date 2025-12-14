@@ -6,9 +6,11 @@ import InputArea from './components/InputArea';
 import LandingPage from './components/LandingPage';
 import Login from './components/Login';
 import AdminDashboard from './components/AdminDashboard';
+import SourcePanel from './components/SourcePanel';
 import { UpgradeModal, SettingsModal } from './components/Modals';
 import { Message, Role, ChatSession, LoadingState, User, UploadedDocument, ViewState, Source } from './types';
 import { sendMessageToGemini, initializeChat, updateChatContext, uploadDocument, getDocuments, deleteDocumentApi } from './services/gemini';
+import { SourceInfo } from './components/CitationBubble';
 
 function App() {
   const [currentView, setCurrentView] = useState<ViewState>('landing');
@@ -23,6 +25,9 @@ function App() {
   // Modal States
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  
+  // Source Panel State
+  const [activeSource, setActiveSource] = useState<SourceInfo | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -524,7 +529,12 @@ function App() {
             ) : (
             <div className="flex flex-col pb-4 pt-4 min-h-0 max-w-4xl mx-auto">
                 {messages.map((msg, idx) => (
-                <ChatBubble key={msg.id} message={msg} onRegenerate={() => handleSendMessage(msg.content)} />
+                <ChatBubble 
+                  key={msg.id} 
+                  message={msg} 
+                  onRegenerate={() => handleSendMessage(msg.content)}
+                  onOpenSource={(source) => setActiveSource(source)}
+                />
                 ))}
             </div>
             )}
@@ -534,6 +544,12 @@ function App() {
             <InputArea onSendMessage={handleSendMessage} isLoading={loadingState === 'streaming'} />
         </div>
       </main>
+      
+      {/* Source Panel */}
+      <SourcePanel 
+        source={activeSource} 
+        onClose={() => setActiveSource(null)} 
+      />
     </div>
   );
 }

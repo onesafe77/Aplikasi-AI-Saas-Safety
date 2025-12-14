@@ -2,14 +2,15 @@ import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { User, ShieldCheck, Copy, Check, RotateCcw, FileText, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Message, Role, Source } from '../types';
-import CitationBubble from './CitationBubble';
+import CitationBubble, { SourceInfo } from './CitationBubble';
 
 interface ChatBubbleProps {
   message: Message;
   onRegenerate?: () => void;
+  onOpenSource?: (source: SourceInfo) => void;
 }
 
-const ChatBubble: React.FC<ChatBubbleProps> = ({ message, onRegenerate }) => {
+const ChatBubble: React.FC<ChatBubbleProps> = ({ message, onRegenerate, onOpenSource }) => {
   const isUser = message.role === Role.USER;
   const [copied, setCopied] = useState(false);
 
@@ -36,18 +37,20 @@ const ChatBubble: React.FC<ChatBubbleProps> = ({ message, onRegenerate }) => {
         const refNum = parseInt(match[1], 10);
         const source = sources.find(s => s.id === refNum);
         if (source) {
+          const sourceInfo = {
+            id: source.id,
+            chunkId: source.chunkId,
+            documentName: source.documentName,
+            pageNumber: source.pageNumber,
+            content: source.content,
+            score: source.score
+          };
           return (
             <CitationBubble 
               key={index} 
               number={refNum} 
-              source={{
-                id: source.id,
-                chunkId: source.chunkId,
-                documentName: source.documentName,
-                pageNumber: source.pageNumber,
-                content: source.content,
-                score: source.score
-              }} 
+              source={sourceInfo}
+              onOpenPanel={onOpenSource}
             />
           );
         }
