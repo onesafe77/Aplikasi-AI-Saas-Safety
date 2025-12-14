@@ -40,6 +40,31 @@ export async function initDatabase() {
       CREATE INDEX IF NOT EXISTS idx_chunks_document_id ON chunks(document_id);
     `);
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS chat_sessions (
+        id VARCHAR(50) PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        user_id VARCHAR(100),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS chat_messages (
+        id SERIAL PRIMARY KEY,
+        session_id VARCHAR(50) REFERENCES chat_sessions(id) ON DELETE CASCADE,
+        role VARCHAR(20) NOT NULL,
+        content TEXT NOT NULL,
+        sources JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_messages_session_id ON chat_messages(session_id);
+    `);
+
     console.log('Database tables initialized');
   } finally {
     client.release();
@@ -104,6 +129,67 @@ export async function getChunksByIds(ids) {
     [ids]
   );
   return result.rows;
+}
+
+export async function getRandomChunk() {
+  const result = await pool.query(
+    `SELECT c.id, c.content, c.page_number,
+            d.name as document_name, d.original_name
+     FROM chunks c 
+     JOIN documents d ON c.document_id = d.id
+     WHERE LENGTH(c.content) > 100 AND LENGTH(c.content) < 500
+     ORDER BY RANDOM()
+     LIMIT 1`
+  );
+  return result.rows[0] || null;
+}
+
+export async function createChatSession(id, title, userId = null) {
+  await pool.query(
+    `INSERT INTO chat_sessions (id, title, user_id) VALUES ($1, $2, $3)
+     ON CONFLICT (id) DO UPDATE SET title = $2, updated_at = CURRENT_TIMESTAMP`,
+    [id, title, userId]
+  );
+}
+
+export async function getChatSessions(userId = null) {
+  const result = await pool.query(
+    `SELECT id, title, created_at, updated_at FROM chat_sessions 
+     ORDER BY updated_at DESC LIMIT 50`
+  );
+  return result.rows;
+}
+
+export async function getChatSession(sessionId) {
+  const result = await pool.query(
+    `SELECT id, title, created_at FROM chat_sessions WHERE id = $1`,
+    [sessionId]
+  );
+  return result.rows[0] || null;
+}
+
+export async function saveChatMessage(sessionId, role, content, sources = null) {
+  await pool.query(
+    `INSERT INTO chat_messages (session_id, role, content, sources) VALUES ($1, $2, $3, $4)`,
+    [sessionId, role, content, sources ? JSON.stringify(sources) : null]
+  );
+  await pool.query(
+    `UPDATE chat_sessions SET updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+    [sessionId]
+  );
+}
+
+export async function getChatMessages(sessionId) {
+  const result = await pool.query(
+    `SELECT id, role, content, sources, created_at FROM chat_messages 
+     WHERE session_id = $1 ORDER BY created_at ASC`,
+    [sessionId]
+  );
+  return result.rows;
+}
+
+export async function deleteChatSession(sessionId) {
+  await pool.query(`DELETE FROM chat_sessions WHERE id = $1`, [sessionId]);
 }
 
 export { pool };

@@ -76,36 +76,26 @@ const Sidebar: React.FC<SidebarProps> = ({
           
           {/* History Section */}
           <div>
-            <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-3 px-2">Hari Ini</h3>
-            <ul className="space-y-1">
-              {sessions.map((session) => (
-                <li key={session.id}>
-                  <button 
-                    onClick={() => onLoadSession(session.id)}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-zinc-100 transition-colors text-left group"
-                  >
-                    <MessageSquare className="w-4 h-4 text-zinc-300 group-hover:text-emerald-600 transition-colors" />
-                    <span className="text-[13px] truncate text-zinc-600 group-hover:text-zinc-900 font-medium">
-                      {session.title}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-          
-           <div>
-            <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-3 px-2">Kemarin</h3>
-            <ul className="space-y-1 opacity-60 hover:opacity-100 transition-opacity">
-               <li className="px-3 py-2 text-[13px] text-zinc-500 flex items-center gap-3 cursor-pointer hover:bg-zinc-100 rounded-lg">
-                   <MessageSquare className="w-4 h-4 text-zinc-300" />
-                   Prosedur APD Konstruksi
-               </li>
-               <li className="px-3 py-2 text-[13px] text-zinc-500 flex items-center gap-3 cursor-pointer hover:bg-zinc-100 rounded-lg">
-                   <MessageSquare className="w-4 h-4 text-zinc-300" />
-                   Analisa Risiko Kebakaran
-               </li>
-            </ul>
+            <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-3 px-2">Riwayat Chat</h3>
+            {sessions.length === 0 ? (
+              <p className="text-xs text-zinc-400 px-2">Belum ada riwayat chat</p>
+            ) : (
+              <ul className="space-y-1">
+                {sessions.map((session) => (
+                  <li key={session.id}>
+                    <button 
+                      onClick={() => onLoadSession(session.id)}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-zinc-100 transition-colors text-left group"
+                    >
+                      <MessageSquare className="w-4 h-4 text-zinc-300 group-hover:text-emerald-600 transition-colors" />
+                      <span className="text-[13px] truncate text-zinc-600 group-hover:text-zinc-900 font-medium">
+                        {session.title}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
         </div>

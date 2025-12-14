@@ -1,5 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ShieldCheck, ArrowRight, BookOpen, AlertTriangle, FileText, Check, Star, Zap, Building2, Users, ChevronRight, Menu, HardHat, Factory, Truck, Search, Camera, Download, Scale, Hammer, Landmark, Pickaxe, Briefcase, HelpCircle, ChevronDown, ChevronUp, Play, Fingerprint, MousePointer2, Database, BrainCircuit, FileCheck } from 'lucide-react';
+
+interface SpotlightData {
+  content: string;
+  documentName: string;
+  pageNumber: number;
+}
 
 interface LandingPageProps {
   onStart: () => void;
@@ -33,8 +39,26 @@ const TestimonialCard: React.FC<{ item: typeof TESTIMONIALS[0] }> = ({ item }) =
   </div>
 );
 
+const DEFAULT_SPOTLIGHT = {
+  content: "Setiap tenaga kerja berhak mendapat perlindungan atas keselamatannya dalam melakukan pekerjaan untuk kesejahteraan hidup dan meningkatkan produksi serta produktivitas Nasional.",
+  documentName: "UU No. 1 Tahun 1970",
+  pageNumber: 1
+};
+
 const LandingPage: React.FC<LandingPageProps> = ({ onStart }) => {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+  const [spotlight, setSpotlight] = useState<SpotlightData>(DEFAULT_SPOTLIGHT);
+
+  useEffect(() => {
+    fetch('/api/spotlight')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.content) {
+          setSpotlight(data);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
@@ -315,6 +339,50 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart }) => {
              </div>
          </div>
        </section>
+
+      {/* Regulasi Spotlight Section */}
+      <section className="py-24 px-6 bg-gradient-to-br from-emerald-50 via-white to-teal-50 flex-shrink-0 relative overflow-hidden">
+        <div className="absolute inset-0 bg-grid-pattern opacity-30 pointer-events-none"></div>
+        <div className="max-w-4xl mx-auto relative z-10">
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold uppercase tracking-widest mb-4 border border-emerald-200 animate-fade-in-up">
+              <Scale className="w-3 h-3" />
+              Regulasi Spotlight
+            </div>
+            <h2 className="font-display text-2xl md:text-3xl text-zinc-900 font-bold tracking-tight animate-fade-in-up [animation-delay:200ms]">
+              Kutipan Penting dari Regulasi K3
+            </h2>
+          </div>
+          
+          <div className="relative bg-white rounded-[2rem] p-8 md:p-12 shadow-xl shadow-emerald-100/50 border border-emerald-100 animate-fade-in-up [animation-delay:400ms] group hover:shadow-2xl hover:shadow-emerald-200/50 transition-all duration-500">
+            <div className="absolute top-6 left-8 text-emerald-200 opacity-50">
+              <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z"/>
+              </svg>
+            </div>
+            
+            <div className="pl-8 md:pl-16">
+              <p className="text-xl md:text-2xl text-zinc-700 leading-relaxed italic mb-6">
+                "{spotlight.content}"
+              </p>
+              
+              <div className="flex items-center gap-4">
+                <div className="w-1 h-12 bg-gradient-to-b from-emerald-500 to-teal-500 rounded-full"></div>
+                <div>
+                  <p className="font-bold text-zinc-900">{spotlight.documentName}</p>
+                  <p className="text-sm text-zinc-500">Halaman {spotlight.pageNumber}</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="absolute bottom-6 right-8 text-emerald-200 opacity-50 rotate-180">
+              <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Features Section - Dark Mode Bento Grid */}
       <section id="features" className="py-32 px-6 bg-[#09090B] flex-shrink-0 relative overflow-hidden text-white">

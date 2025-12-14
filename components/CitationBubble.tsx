@@ -19,10 +19,10 @@ const CitationBubble: React.FC<CitationBubbleProps> = ({ number, source }) => {
   const [showPopup, setShowPopup] = useState(false);
 
   return (
-    <span className="relative inline-block">
+    <span className="relative inline">
       <button
         onClick={() => setShowPopup(!showPopup)}
-        className="inline-flex items-center justify-center w-5 h-5 text-[10px] font-bold text-white bg-emerald-500 rounded-full hover:bg-emerald-600 transition-colors mx-0.5 cursor-pointer shadow-sm hover:shadow-md"
+        className="inline-flex items-center justify-center w-4 h-4 text-[9px] font-semibold text-emerald-700 bg-emerald-100 rounded hover:bg-emerald-200 transition-colors cursor-pointer align-super -ml-0.5 mr-0.5"
         title={`Sumber: ${source.documentName}`}
       >
         {number}

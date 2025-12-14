@@ -10,11 +10,6 @@ import { UpgradeModal, SettingsModal } from './components/Modals';
 import { Message, Role, ChatSession, LoadingState, User, UploadedDocument, ViewState, Source } from './types';
 import { sendMessageToGemini, initializeChat, updateChatContext, uploadDocument, getDocuments, deleteDocumentApi } from './services/gemini';
 
-const SAMPLE_SESSIONS: ChatSession[] = [
-  { id: '1', title: 'Analisa Regulasi Internal', date: 'Today' },
-  { id: '2', title: 'Prosedur APD Konstruksi', date: 'Yesterday' },
-];
-
 function App() {
   const [currentView, setCurrentView] = useState<ViewState>('landing');
   const [messages, setMessages] = useState<Message[]>([]);
@@ -22,6 +17,8 @@ function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [loadingState, setLoadingState] = useState<LoadingState>('idle');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   
   // Modal States
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -79,6 +76,24 @@ function App() {
     loadDocuments();
   }, []);
 
+  // Load chat sessions from database
+  useEffect(() => {
+    const loadSessions = async () => {
+      try {
+        const res = await fetch('/api/sessions');
+        const data = await res.json();
+        setSessions(data.map((s: any) => ({
+          id: s.id,
+          title: s.title,
+          date: new Date(s.updated_at).toLocaleDateString('id-ID')
+        })));
+      } catch (error) {
+        console.error('Failed to load sessions:', error);
+      }
+    };
+    loadSessions();
+  }, []);
+
   const scrollToBottom = () => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -101,19 +116,62 @@ function App() {
       setShowSettingsModal(false);
   };
 
-  const handleNewChat = () => {
+  const handleNewChat = async () => {
+    const newId = `chat_${Date.now()}`;
+    setCurrentSessionId(newId);
     setMessages([]);
     setLoadingState('idle');
     if (window.innerWidth < 768) setSidebarOpen(false);
     setCurrentView('chat');
+    
+    // Create session in database
+    try {
+      await fetch('/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: newId, title: 'Chat Baru' })
+      });
+      // Refresh sessions
+      const res = await fetch('/api/sessions');
+      const data = await res.json();
+      setSessions(data.map((s: any) => ({
+        id: s.id,
+        title: s.title,
+        date: new Date(s.updated_at).toLocaleDateString('id-ID')
+      })));
+    } catch (error) {
+      console.error('Failed to create session:', error);
+    }
   };
 
-  const handleLoadSession = (id: string) => {
-      handleNewChat();
-      setMessages([
-          { id: '1', role: Role.USER, content: 'Apa saja kewajiban kontraktor di area pabrik?', timestamp: Date.now() },
-          { id: '2', role: Role.MODEL, content: 'Berdasarkan dokumen yang diupload:\n\n1. Wajib memiliki **CSMS** (Contractor Safety Management System) [Sumber: Manual_CSMS_2024.txt].\n2. Melakukan safety induction sebelum mulai kerja [Sumber: SOP_Induksi.txt].', timestamp: Date.now() }
-      ]);
+  const handleLoadSession = async (id: string) => {
+    setCurrentSessionId(id);
+    setLoadingState('idle');
+    if (window.innerWidth < 768) setSidebarOpen(false);
+    setCurrentView('chat');
+    
+    try {
+      const res = await fetch(`/api/sessions/${id}/messages`);
+      const data = await res.json();
+      setMessages(data.map((m: any) => {
+        let parsedSources;
+        try {
+          parsedSources = m.sources ? (typeof m.sources === 'string' ? JSON.parse(m.sources) : m.sources) : undefined;
+        } catch {
+          parsedSources = undefined;
+        }
+        return {
+          id: m.id.toString(),
+          role: m.role === 'user' ? Role.USER : Role.MODEL,
+          content: m.content,
+          timestamp: new Date(m.created_at).getTime(),
+          sources: parsedSources
+        };
+      }));
+    } catch (error) {
+      console.error('Failed to load session messages:', error);
+      setMessages([]);
+    }
   };
 
   const handleDocumentUpload = async (file: File, onProgress?: (percent: number) => void) => {
@@ -145,6 +203,22 @@ function App() {
   const handleSendMessage = async (text: string, image?: string) => {
     const displayContent = image ? `[Attachment] ${text}` : text;
     
+    // Create session if not exists
+    let sessionId = currentSessionId;
+    if (!sessionId) {
+      sessionId = `chat_${Date.now()}`;
+      setCurrentSessionId(sessionId);
+      try {
+        await fetch('/api/sessions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: sessionId, title: text.substring(0, 50) })
+        });
+      } catch (e) {
+        console.error('Failed to create session:', e);
+      }
+    }
+    
     const userMsg: Message = {
       id: Date.now().toString(),
       role: Role.USER,
@@ -154,6 +228,33 @@ function App() {
 
     setMessages(prev => [...prev, userMsg]);
     setLoadingState('streaming');
+    
+    // Save user message to database
+    if (sessionId) {
+      fetch(`/api/sessions/${sessionId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'user', content: displayContent })
+      }).catch(console.error);
+      
+      // Update session title if first message
+      if (messages.length === 0) {
+        fetch(`/api/sessions/${sessionId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: text.substring(0, 50) })
+        }).then(() => {
+          // Refresh sessions list
+          fetch('/api/sessions')
+            .then(res => res.json())
+            .then(data => setSessions(data.map((s: any) => ({
+              id: s.id,
+              title: s.title,
+              date: new Date(s.updated_at).toLocaleDateString('id-ID')
+            }))));
+        }).catch(console.error);
+      }
+    }
 
     const aiMsgId = (Date.now() + 1).toString();
     const aiPlaceholder: Message = {
@@ -191,6 +292,15 @@ function App() {
           : msg
       ));
       setLoadingState('idle');
+      
+      // Save AI response to database
+      if (sessionId) {
+        fetch(`/api/sessions/${sessionId}/messages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ role: 'model', content: accumulatedText, sources: messageSources })
+        }).catch(console.error);
+      }
 
     } catch (error) {
       setMessages(prev => prev.map(msg => 
@@ -229,7 +339,7 @@ function App() {
       <Sidebar 
         isOpen={sidebarOpen} 
         toggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-        sessions={SAMPLE_SESSIONS}
+        sessions={sessions}
         user={currentUser}
         onNewChat={handleNewChat}
         onLoadSession={handleLoadSession}

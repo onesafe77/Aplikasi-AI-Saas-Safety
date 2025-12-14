@@ -15,7 +15,14 @@ import {
   getAllDocuments, 
   deleteDocument,
   getAllChunks,
-  getChunksByIds 
+  getChunksByIds,
+  getRandomChunk,
+  createChatSession,
+  getChatSessions,
+  getChatSession,
+  saveChatMessage,
+  getChatMessages,
+  deleteChatSession
 } from './database.js';
 import { 
   chunkText, 
@@ -51,10 +58,11 @@ You are **Si Asef**, an intelligent and professional **Safety Assistant (Asisten
 4. **Internal Documents:** Referenced documents from the knowledge base.
 
 **INSTRUCTIONS:**
-1. **Use Document References:** When answering, cite sources using {{ref:N}} format where N is the source number.
-2. **Be Specific:** Quote relevant parts from documents.
-3. **Tone:** Professional, Helpful, authoritative but friendly.
-4. **Language:** Indonesian (Bahasa Indonesia).
+1. **Citation Style:** Use {{ref:N}} format sparingly. Place citations only at the END of sentences or paragraphs that contain key facts. Do NOT scatter citations throughout every phrase. One citation per key point is sufficient.
+2. **Clean Writing:** Write naturally flowing text first, then add a single citation reference at the end of each important statement. Avoid: "Menurut {{ref:1}} peraturan ini {{ref:1}} menyatakan..."
+3. **Be Specific:** Quote relevant parts from documents when needed.
+4. **Tone:** Professional, Helpful, authoritative but friendly.
+5. **Language:** Indonesian (Bahasa Indonesia).
 `;
 
 const chatSessions = new Map();
@@ -239,6 +247,87 @@ app.get('/api/health', (req, res) => {
     hasApiKey: !!process.env.GEMINI_API_KEY,
     hasDatabase: !!process.env.DATABASE_URL
   });
+});
+
+app.get('/api/spotlight', async (req, res) => {
+  try {
+    const chunk = await getRandomChunk();
+    if (chunk) {
+      res.json({
+        content: chunk.content,
+        documentName: chunk.name || chunk.original_name,
+        pageNumber: chunk.page_number
+      });
+    } else {
+      res.json(null);
+    }
+  } catch (error) {
+    console.error('Spotlight error:', error);
+    res.status(500).json({ error: 'Failed to get spotlight' });
+  }
+});
+
+app.get('/api/sessions', async (req, res) => {
+  try {
+    const sessions = await getChatSessions();
+    res.json(sessions);
+  } catch (error) {
+    console.error('Get sessions error:', error);
+    res.status(500).json({ error: 'Failed to get sessions' });
+  }
+});
+
+app.post('/api/sessions', async (req, res) => {
+  try {
+    const { id, title } = req.body;
+    await createChatSession(id, title || 'Chat Baru');
+    res.json({ success: true, id });
+  } catch (error) {
+    console.error('Create session error:', error);
+    res.status(500).json({ error: 'Failed to create session' });
+  }
+});
+
+app.get('/api/sessions/:id/messages', async (req, res) => {
+  try {
+    const messages = await getChatMessages(req.params.id);
+    res.json(messages);
+  } catch (error) {
+    console.error('Get messages error:', error);
+    res.status(500).json({ error: 'Failed to get messages' });
+  }
+});
+
+app.post('/api/sessions/:id/messages', async (req, res) => {
+  try {
+    const { role, content, sources } = req.body;
+    await saveChatMessage(req.params.id, role, content, sources);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Save message error:', error);
+    res.status(500).json({ error: 'Failed to save message' });
+  }
+});
+
+app.put('/api/sessions/:id', async (req, res) => {
+  try {
+    const { title } = req.body;
+    await createChatSession(req.params.id, title);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Update session error:', error);
+    res.status(500).json({ error: 'Failed to update session' });
+  }
+});
+
+app.delete('/api/sessions/:id', async (req, res) => {
+  try {
+    await deleteChatSession(req.params.id);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete session error:', error);
+    res.status(500).json({ error: 'Failed to delete session' });
+  }
 });
 
 const distPath = path.join(__dirname, '..', 'dist');
