@@ -57,6 +57,9 @@ The application uses a secure backend proxy pattern:
    - Chat sessions saved to PostgreSQL (chat_sessions, chat_messages tables)
    - View and continue previous conversations from sidebar
    - Session titles auto-generated from first message
+6. **AI Response Formatting**: AI now uses structured formatting (bullet points, numbered lists, headers, bold text) for better readability
+7. **Citation Hover Preview**: Hover over citation badges to see quick preview with document name, page, and excerpt (300ms delay)
+8. **Source Panel**: Click citation badges to open full-screen side panel with complete document reference details
 
 ### Previous Changes
 - Fixed pdf-parse import using dynamic import for ESM compatibility
