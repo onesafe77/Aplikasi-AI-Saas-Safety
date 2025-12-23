@@ -6,7 +6,49 @@ import multer from 'multer';
 import fs from 'fs';
 import mammoth from 'mammoth';
 import pdfParse from '@cyber2024/pdf-parse-fixed';
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { GoogleGenAI } from '@google/genai';
+
+async function parsePdfWithPdfjs(buffer) {
+  try {
+    const data = new Uint8Array(buffer);
+    const loadingTask = pdfjsLib.getDocument({ data, useSystemFonts: true });
+    const pdf = await loadingTask.promise;
+    
+    let fullText = '';
+    const pageCount = pdf.numPages;
+    
+    for (let i = 1; i <= pageCount; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items.map(item => item.str).join(' ');
+      fullText += pageText + '\n';
+    }
+    
+    return { text: fullText, numpages: pageCount };
+  } catch (error) {
+    console.error('pdfjs parsing error:', error.message);
+    throw error;
+  }
+}
+
+async function parsePdfRobust(buffer) {
+  try {
+    const result = await parsePdfWithPdfjs(buffer);
+    console.log(`PDF parsed with pdfjs: ${result.numpages} pages, ${result.text.length} chars`);
+    return result;
+  } catch (pdfjsError) {
+    console.log('pdfjs failed, trying pdf-parse fallback...');
+    try {
+      const result = await pdfParse(buffer);
+      console.log(`PDF parsed with pdf-parse: ${result.numpages} pages, ${result.text.length} chars`);
+      return result;
+    } catch (pdfParseError) {
+      console.error('Both PDF parsers failed');
+      throw pdfParseError;
+    }
+  }
+}
 import { 
   initDatabase, 
   insertDocument, 
@@ -96,13 +138,12 @@ app.post('/api/documents/upload', upload.single('file'), async (req, res) => {
 
     if (mimetype === 'application/pdf') {
       try {
-        const pdfData = await pdfParse(buffer);
+        const pdfData = await parsePdfRobust(buffer);
         textContent = pdfData.text;
         pageCount = pdfData.numpages || 1;
-        console.log(`PDF parsed: ${pageCount} pages, ${textContent.length} chars extracted`);
       } catch (pdfError) {
         console.error('PDF parsing error:', pdfError.message);
-        if (pdfError.message.includes('password') || pdfError.message.includes('encrypted')) {
+        if (pdfError.message && (pdfError.message.includes('password') || pdfError.message.includes('encrypted'))) {
           return res.status(400).json({ 
             error: 'PDF ini terproteksi password. Silakan buka proteksi PDF terlebih dahulu.' 
           });
