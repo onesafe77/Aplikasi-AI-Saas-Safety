@@ -109,6 +109,7 @@ export async function getAllDocuments() {
 }
 
 export async function deleteDocument(id) {
+  await pool.query(`DELETE FROM chunks WHERE document_id = $1`, [id]);
   await pool.query(`DELETE FROM documents WHERE id = $1`, [id]);
 }
 
