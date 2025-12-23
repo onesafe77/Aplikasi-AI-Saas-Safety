@@ -179,8 +179,8 @@ function App() {
     }
   };
 
-  const handleDocumentUpload = async (file: File, onProgress?: (percent: number) => void) => {
-    const result = await uploadDocument(file, onProgress);
+  const handleDocumentUpload = async (file: File, folder: string = 'Umum', onProgress?: (percent: number) => void) => {
+    const result = await uploadDocument(file, folder, onProgress);
     if (result.success) {
       const docs = await getDocuments();
       setDocuments(docs.map((d: any) => ({
@@ -189,7 +189,8 @@ function App() {
         type: d.file_type,
         content: '',
         uploadDate: new Date(d.created_at).getTime(),
-        size: d.file_size
+        size: d.file_size,
+        folder: d.folder || 'Umum'
       })));
     } else {
       throw new Error(result.error || 'Upload failed');

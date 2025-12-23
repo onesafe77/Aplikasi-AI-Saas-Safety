@@ -10,6 +10,7 @@ export interface Source {
   pageNumber: number;
   content: string;
   score: number;
+  folder?: string;
 }
 
 export interface Message {
@@ -41,6 +42,7 @@ export interface UploadedDocument {
   content: string; // The actual text content
   uploadDate: number;
   size: string;
+  folder?: string;
 }
 
 export type LoadingState = 'idle' | 'streaming' | 'error';

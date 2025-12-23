@@ -144,12 +144,15 @@ app.post('/api/documents/upload', upload.single('file'), async (req, res) => {
                      size < 1024 * 1024 ? `${(size / 1024).toFixed(1)} KB` : 
                      `${(size / (1024 * 1024)).toFixed(1)} MB`;
 
+    const folder = req.body.folder || 'Umum';
+
     const docId = await insertDocument(
       originalname,
       originalname,
       mimetype,
       fileSize,
-      pageCount
+      pageCount,
+      folder
     );
 
     const chunks = chunkText(textContent, 1);

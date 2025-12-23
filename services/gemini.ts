@@ -7,6 +7,7 @@ export interface Source {
   pageNumber: number;
   content: string;
   score: number;
+  folder?: string;
 }
 
 export interface ChatResponse {
@@ -109,10 +110,12 @@ export const sendMessageToGemini = async (
 
 export const uploadDocument = async (
   file: File, 
+  folder: string = 'Umum',
   onProgress?: (percent: number) => void
 ): Promise<{ success: boolean; documentId?: number; error?: string }> => {
   const formData = new FormData();
   formData.append('file', file);
+  formData.append('folder', folder);
 
   return new Promise((resolve) => {
     const xhr = new XMLHttpRequest();

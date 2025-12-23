@@ -1,10 +1,17 @@
 import React, { useState, useRef } from 'react';
-import { UploadCloud, FileText, Trash2, Search, ArrowLeft, CheckCircle2, Database, AlertCircle, FileType, HardDrive, LogOut, Loader2 } from 'lucide-react';
+import { UploadCloud, FileText, Trash2, Search, CheckCircle2, Database, AlertCircle, LogOut, Loader2, FolderOpen, ChevronDown, ChevronRight, FileType, HardDrive } from 'lucide-react';
 import { UploadedDocument } from '../types';
+
+const FOLDERS = [
+  'Peraturan Pemerintah',
+  'SOP GECL',
+  'SOP BIB',
+  'Umum'
+];
 
 interface AdminDashboardProps {
   documents: UploadedDocument[];
-  onUpload: (file: File, onProgress?: (percent: number) => void) => Promise<void>;
+  onUpload: (file: File, folder: string, onProgress?: (percent: number) => void) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onLogout: () => void;
 }
@@ -16,6 +23,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ documents, onUpload, on
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selectedFolder, setSelectedFolder] = useState('Peraturan Pemerintah');
+  const [expandedFolders, setExpandedFolders] = useState<string[]>(FOLDERS);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -37,8 +46,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ documents, onUpload, on
       setUploadSuccess(null);
       setUploadError(null);
       try {
-        await onUpload(e.dataTransfer.files[0], (percent) => setUploadProgress(percent));
-        setUploadSuccess(`File "${fileName}" berhasil diupload!`);
+        await onUpload(e.dataTransfer.files[0], selectedFolder, (percent) => setUploadProgress(percent));
+        setUploadSuccess(`File "${fileName}" berhasil diupload ke folder "${selectedFolder}"!`);
         setTimeout(() => setUploadSuccess(null), 5000);
       } catch (error: any) {
         console.error('Upload failed:', error);
@@ -59,8 +68,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ documents, onUpload, on
       setUploadSuccess(null);
       setUploadError(null);
       try {
-        await onUpload(e.target.files[0], (percent) => setUploadProgress(percent));
-        setUploadSuccess(`File "${fileName}" berhasil diupload!`);
+        await onUpload(e.target.files[0], selectedFolder, (percent) => setUploadProgress(percent));
+        setUploadSuccess(`File "${fileName}" berhasil diupload ke folder "${selectedFolder}"!`);
         setTimeout(() => setUploadSuccess(null), 5000);
       } catch (error: any) {
         console.error('Upload failed:', error);
@@ -74,6 +83,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ documents, onUpload, on
         }
       }
     }
+  };
+
+  const toggleFolder = (folder: string) => {
+    setExpandedFolders(prev => 
+      prev.includes(folder) ? prev.filter(f => f !== folder) : [...prev, folder]
+    );
+  };
+
+  const getDocumentsByFolder = (folder: string) => {
+    return documents.filter(d => (d.folder || 'Umum') === folder);
   };
 
   const handleDelete = async (id: string) => {
@@ -114,6 +133,27 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ documents, onUpload, on
             </div>
         </div>
 
+        {/* Folder Selection */}
+        <div className="mb-6">
+            <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2 block">Pilih Folder Tujuan</label>
+            <div className="flex gap-2 flex-wrap">
+                {FOLDERS.map((folder) => (
+                    <button
+                        key={folder}
+                        onClick={() => setSelectedFolder(folder)}
+                        className={`px-4 py-2 rounded-xl font-medium text-sm transition-all flex items-center gap-2 ${
+                            selectedFolder === folder 
+                                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30' 
+                                : 'bg-white border border-zinc-200 text-zinc-600 hover:border-emerald-400 hover:text-emerald-600'
+                        }`}
+                    >
+                        <FolderOpen className="w-4 h-4" />
+                        {folder}
+                    </button>
+                ))}
+            </div>
+        </div>
+
         {/* Upload Area */}
         <div 
             className={`
@@ -137,7 +177,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ documents, onUpload, on
                 {isUploading ? <Loader2 className="w-8 h-8 animate-spin" /> : <UploadCloud className="w-8 h-8" />}
             </div>
             <h3 className="text-xl font-bold text-zinc-800 mb-2">
-                {isUploading ? `Mengupload Dokumen... ${uploadProgress}%` : 'Upload Dokumen Baru'}
+                {isUploading ? `Mengupload ke "${selectedFolder}"... ${uploadProgress}%` : `Upload ke Folder "${selectedFolder}"`}
             </h3>
             {isUploading && (
                 <div className="w-full max-w-md mb-4">
@@ -179,7 +219,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ documents, onUpload, on
             </div>
         )}
 
-        {/* Document List */}
+        {/* Document List by Folder */}
         <div className="bg-white rounded-[2rem] border border-zinc-200 shadow-sm overflow-hidden">
             <div className="px-8 py-6 border-b border-zinc-100 flex items-center justify-between">
                 <h3 className="font-bold text-lg text-zinc-800 flex items-center gap-2">
@@ -204,59 +244,93 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ documents, onUpload, on
                     <p className="text-zinc-500 font-medium">Belum ada dokumen yang diupload.</p>
                 </div>
             ) : (
-                <table className="w-full text-left">
-                    <thead className="bg-zinc-50/50 text-xs font-bold text-zinc-400 uppercase tracking-wider">
-                        <tr>
-                            <th className="px-8 py-4">Nama File</th>
-                            <th className="px-8 py-4">Tipe</th>
-                            <th className="px-8 py-4">Tanggal Upload</th>
-                            <th className="px-8 py-4">Status</th>
-                            <th className="px-8 py-4 text-right">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-100">
-                        {documents.map((doc) => (
-                            <tr key={doc.id} className="hover:bg-zinc-50/50 transition-colors group">
-                                <td className="px-8 py-4">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
-                                            <FileText className="w-5 h-5" />
-                                        </div>
-                                        <div>
-                                            <p className="font-bold text-zinc-800 text-sm">{doc.name}</p>
-                                            <p className="text-xs text-zinc-400">{doc.size}</p>
-                                        </div>
+                <div className="divide-y divide-zinc-100">
+                    {FOLDERS.map((folder) => {
+                        const folderDocs = getDocumentsByFolder(folder);
+                        if (folderDocs.length === 0) return null;
+                        const isExpanded = expandedFolders.includes(folder);
+                        
+                        return (
+                            <div key={folder}>
+                                <button
+                                    onClick={() => toggleFolder(folder)}
+                                    className="w-full px-8 py-4 flex items-center justify-between hover:bg-zinc-50 transition-colors"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        {isExpanded ? (
+                                            <ChevronDown className="w-5 h-5 text-zinc-400" />
+                                        ) : (
+                                            <ChevronRight className="w-5 h-5 text-zinc-400" />
+                                        )}
+                                        <FolderOpen className="w-5 h-5 text-emerald-600" />
+                                        <span className="font-bold text-zinc-800">{folder}</span>
+                                        <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold">
+                                            {folderDocs.length} dokumen
+                                        </span>
                                     </div>
-                                </td>
-                                <td className="px-8 py-4">
-                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-zinc-100 text-zinc-600 text-xs font-bold uppercase">
-                                        <FileType className="w-3 h-3" />
-                                        {doc.type.split('/')[1] || 'FILE'}
-                                    </span>
-                                </td>
-                                <td className="px-8 py-4 text-sm text-zinc-500">
-                                    {new Date(doc.uploadDate).toLocaleDateString()}
-                                </td>
-                                <td className="px-8 py-4">
-                                    <div className="flex items-center gap-2">
-                                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                                        <span className="text-sm font-medium text-emerald-600">Terindeks</span>
+                                </button>
+                                
+                                {isExpanded && (
+                                    <div className="bg-zinc-50/50">
+                                        <table className="w-full text-left">
+                                            <thead className="bg-zinc-100/50 text-xs font-bold text-zinc-400 uppercase tracking-wider">
+                                                <tr>
+                                                    <th className="px-8 py-3 pl-16">Nama File</th>
+                                                    <th className="px-8 py-3">Tipe</th>
+                                                    <th className="px-8 py-3">Tanggal Upload</th>
+                                                    <th className="px-8 py-3">Status</th>
+                                                    <th className="px-8 py-3 text-right">Aksi</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-zinc-100">
+                                                {folderDocs.map((doc) => (
+                                                    <tr key={doc.id} className="hover:bg-white transition-colors group">
+                                                        <td className="px-8 py-4 pl-16">
+                                                            <div className="flex items-center gap-4">
+                                                                <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+                                                                    <FileText className="w-5 h-5" />
+                                                                </div>
+                                                                <div>
+                                                                    <p className="font-bold text-zinc-800 text-sm">{doc.name}</p>
+                                                                    <p className="text-xs text-zinc-400">{doc.size}</p>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-8 py-4">
+                                                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-zinc-100 text-zinc-600 text-xs font-bold uppercase">
+                                                                <FileType className="w-3 h-3" />
+                                                                {doc.type.split('/')[1] || 'FILE'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-8 py-4 text-sm text-zinc-500">
+                                                            {new Date(doc.uploadDate).toLocaleDateString()}
+                                                        </td>
+                                                        <td className="px-8 py-4">
+                                                            <div className="flex items-center gap-2">
+                                                                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                                                                <span className="text-sm font-medium text-emerald-600">Terindeks</span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-8 py-4 text-right">
+                                                            <button 
+                                                                onClick={(e) => { e.stopPropagation(); handleDelete(doc.id); }}
+                                                                className={`p-2 rounded-lg transition-colors ${deletingId === doc.id ? 'text-red-400 cursor-wait' : 'text-zinc-400 hover:text-red-500 hover:bg-red-50'}`}
+                                                                title="Hapus Dokumen"
+                                                                disabled={deletingId === doc.id}
+                                                            >
+                                                                {deletingId === doc.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
                                     </div>
-                                </td>
-                                <td className="px-8 py-4 text-right">
-                                    <button 
-                                        onClick={() => handleDelete(doc.id)}
-                                        className={`p-2 rounded-lg transition-colors ${deletingId === doc.id ? 'text-red-400 cursor-wait' : 'text-zinc-400 hover:text-red-500 hover:bg-red-50'}`}
-                                        title="Hapus Dokumen"
-                                        disabled={deletingId === doc.id}
-                                    >
-                                        {deletingId === doc.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                                    </button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
             )}
         </div>
         
