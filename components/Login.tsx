@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Lock, Eye, EyeOff, ArrowRight, Loader2, ArrowLeft, Quote, ShieldAlert, IdCard, CheckCircle2 } from 'lucide-react';
+import { ShieldCheck, Lock, Eye, EyeOff, ArrowRight, Loader2, Quote, ShieldAlert, IdCard, CheckCircle2 } from 'lucide-react';
 import { User as UserType } from '../types';
 
 interface LoginProps {
   onLoginSuccess: (user: UserType) => void;
-  onBack: () => void;
 }
 
-const Login: React.FC<LoginProps> = ({ onLoginSuccess, onBack }) => {
+const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [nik, setNik] = useState('');
@@ -57,15 +56,6 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess, onBack }) => {
       <div className="w-full lg:w-[45%] flex flex-col justify-center px-8 sm:px-12 lg:px-16 xl:px-24 py-12 relative z-10 bg-white">
         <div className="max-w-[420px] w-full mx-auto">
             
-            {/* Back Button */}
-            <button 
-                onClick={onBack}
-                className="group flex items-center gap-2 text-zinc-400 hover:text-emerald-600 transition-colors mb-8 py-2 rounded-lg"
-            >
-                <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
-                <span className="text-sm font-medium">Kembali</span>
-            </button>
-
             {/* Header / Logo */}
             <div className="flex items-center gap-3 mb-8">
               <div className="w-10 h-10 bg-zinc-900 text-white rounded-xl flex items-center justify-center shadow-lg">

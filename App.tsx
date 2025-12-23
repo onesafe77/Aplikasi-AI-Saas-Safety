@@ -13,7 +13,7 @@ import { sendMessageToGemini, initializeChat, updateChatContext, uploadDocument,
 import { SourceInfo } from './components/CitationBubble';
 
 function App() {
-  const [currentView, setCurrentView] = useState<ViewState>('landing');
+  const [currentView, setCurrentView] = useState<ViewState>('login');
   const [messages, setMessages] = useState<Message[]>([]);
   const [documents, setDocuments] = useState<UploadedDocument[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -117,7 +117,7 @@ function App() {
   const handleLogout = () => {
       setCurrentUser(null);
       setMessages([]);
-      setCurrentView('landing');
+      setCurrentView('login');
       setShowSettingsModal(false);
   };
 
@@ -324,7 +324,7 @@ function App() {
   }
 
   if (currentView === 'login') {
-    return <Login onLoginSuccess={handleLoginSuccess} onBack={() => setCurrentView('landing')} />;
+    return <Login onLoginSuccess={handleLoginSuccess} />;
   }
 
   if (currentView === 'admin') {
