@@ -16,10 +16,15 @@ export async function initDatabase() {
         original_name VARCHAR(255) NOT NULL,
         file_type VARCHAR(50) NOT NULL,
         file_size VARCHAR(50),
+        folder VARCHAR(100) DEFAULT 'Umum',
         total_pages INTEGER DEFAULT 1,
         total_chunks INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+    `);
+
+    await client.query(`
+      ALTER TABLE documents ADD COLUMN IF NOT EXISTS folder VARCHAR(100) DEFAULT 'Umum';
     `);
 
     await client.query(`
@@ -71,11 +76,11 @@ export async function initDatabase() {
   }
 }
 
-export async function insertDocument(name, originalName, fileType, fileSize, totalPages) {
+export async function insertDocument(name, originalName, fileType, fileSize, totalPages, folder = 'Umum') {
   const result = await pool.query(
-    `INSERT INTO documents (name, original_name, file_type, file_size, total_pages) 
-     VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-    [name, originalName, fileType, fileSize, totalPages]
+    `INSERT INTO documents (name, original_name, file_type, file_size, total_pages, folder) 
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+    [name, originalName, fileType, fileSize, totalPages, folder]
   );
   return result.rows[0].id;
 }
@@ -97,8 +102,8 @@ export async function updateDocumentChunkCount(documentId, count) {
 
 export async function getAllDocuments() {
   const result = await pool.query(
-    `SELECT id, name, original_name, file_type, file_size, total_pages, total_chunks, created_at 
-     FROM documents ORDER BY created_at DESC`
+    `SELECT id, name, original_name, file_type, file_size, folder, total_pages, total_chunks, created_at 
+     FROM documents ORDER BY folder, created_at DESC`
   );
   return result.rows;
 }
@@ -110,7 +115,7 @@ export async function deleteDocument(id) {
 export async function getAllChunks() {
   const result = await pool.query(
     `SELECT c.id, c.document_id, c.chunk_index, c.content, c.page_number, c.embedding,
-            d.name as document_name, d.original_name
+            d.name as document_name, d.original_name, d.folder
      FROM chunks c 
      JOIN documents d ON c.document_id = d.id
      ORDER BY c.document_id, c.chunk_index`
@@ -122,7 +127,7 @@ export async function getChunksByIds(ids) {
   if (!ids || ids.length === 0) return [];
   const result = await pool.query(
     `SELECT c.id, c.document_id, c.chunk_index, c.content, c.page_number,
-            d.name as document_name, d.original_name
+            d.name as document_name, d.original_name, d.folder
      FROM chunks c 
      JOIN documents d ON c.document_id = d.id
      WHERE c.id = ANY($1)`,
