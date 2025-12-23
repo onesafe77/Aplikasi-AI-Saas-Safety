@@ -20,11 +20,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ documents, onUpload, on
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadQueue, setUploadQueue] = useState<{name: string; status: 'pending' | 'uploading' | 'done' | 'error'}[]>([]);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [selectedFolder, setSelectedFolder] = useState('Peraturan Pemerintah');
   const [expandedFolders, setExpandedFolders] = useState<string[]>(FOLDERS);
+  const [searchQuery, setSearchQuery] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -36,51 +38,74 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ documents, onUpload, on
     setIsDragging(false);
   };
 
+  const uploadMultipleFiles = async (files: FileList) => {
+    const fileArray = Array.from(files);
+    if (fileArray.length === 0) return;
+
+    setIsUploading(true);
+    setUploadProgress(0);
+    setUploadSuccess(null);
+    setUploadError(null);
+    setUploadQueue(fileArray.map(f => ({ name: f.name, status: 'pending' })));
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (let i = 0; i < fileArray.length; i++) {
+      const file = fileArray[i];
+      setUploadQueue(prev => prev.map((item, idx) => 
+        idx === i ? { ...item, status: 'uploading' } : item
+      ));
+      setUploadProgress(Math.round((i / fileArray.length) * 100));
+
+      try {
+        await onUpload(file, selectedFolder, () => {});
+        setUploadQueue(prev => prev.map((item, idx) => 
+          idx === i ? { ...item, status: 'done' } : item
+        ));
+        successCount++;
+      } catch (error: any) {
+        console.error('Upload failed:', file.name, error);
+        setUploadQueue(prev => prev.map((item, idx) => 
+          idx === i ? { ...item, status: 'error' } : item
+        ));
+        errorCount++;
+      }
+    }
+
+    setUploadProgress(100);
+    
+    if (successCount > 0 && errorCount === 0) {
+      setUploadSuccess(`${successCount} file berhasil diupload ke folder "${selectedFolder}"!`);
+    } else if (successCount > 0 && errorCount > 0) {
+      setUploadSuccess(`${successCount} file berhasil, ${errorCount} file gagal diupload.`);
+    } else {
+      setUploadError(`Semua ${errorCount} file gagal diupload.`);
+    }
+
+    setTimeout(() => {
+      setUploadSuccess(null);
+      setUploadError(null);
+      setUploadQueue([]);
+    }, 5000);
+
+    setIsUploading(false);
+    setUploadProgress(0);
+  };
+
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const fileName = e.dataTransfer.files[0].name;
-      setIsUploading(true);
-      setUploadProgress(0);
-      setUploadSuccess(null);
-      setUploadError(null);
-      try {
-        await onUpload(e.dataTransfer.files[0], selectedFolder, (percent) => setUploadProgress(percent));
-        setUploadSuccess(`File "${fileName}" berhasil diupload ke folder "${selectedFolder}"!`);
-        setTimeout(() => setUploadSuccess(null), 5000);
-      } catch (error: any) {
-        console.error('Upload failed:', error);
-        setUploadError(error.message || 'Upload gagal');
-        setTimeout(() => setUploadError(null), 5000);
-      } finally {
-        setIsUploading(false);
-        setUploadProgress(0);
-      }
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      await uploadMultipleFiles(e.dataTransfer.files);
     }
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const fileName = e.target.files[0].name;
-      setIsUploading(true);
-      setUploadProgress(0);
-      setUploadSuccess(null);
-      setUploadError(null);
-      try {
-        await onUpload(e.target.files[0], selectedFolder, (percent) => setUploadProgress(percent));
-        setUploadSuccess(`File "${fileName}" berhasil diupload ke folder "${selectedFolder}"!`);
-        setTimeout(() => setUploadSuccess(null), 5000);
-      } catch (error: any) {
-        console.error('Upload failed:', error);
-        setUploadError(error.message || 'Upload gagal');
-        setTimeout(() => setUploadError(null), 5000);
-      } finally {
-        setIsUploading(false);
-        setUploadProgress(0);
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
+    if (e.target.files && e.target.files.length > 0) {
+      await uploadMultipleFiles(e.target.files);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
       }
     }
   };
@@ -92,7 +117,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ documents, onUpload, on
   };
 
   const getDocumentsByFolder = (folder: string) => {
-    return documents.filter(d => (d.folder || 'Umum') === folder);
+    return documents.filter(d => {
+      const matchesFolder = (d.folder || 'Umum') === folder;
+      const matchesSearch = searchQuery === '' || 
+        d.name.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesFolder && matchesSearch;
+    });
   };
 
   const handleDelete = async (id: string) => {
@@ -172,6 +202,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ documents, onUpload, on
                 accept=".txt,.md,.pdf,.doc,.docx"
                 disabled={isUploading}
                 onChange={handleFileSelect}
+                multiple
             />
             <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-4 shadow-sm ${isUploading ? 'bg-emerald-200 text-emerald-700' : 'bg-emerald-100 text-emerald-600'}`}>
                 {isUploading ? <Loader2 className="w-8 h-8 animate-spin" /> : <UploadCloud className="w-8 h-8" />}
@@ -194,8 +225,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ documents, onUpload, on
             )}
             {!isUploading && (
                 <p className="text-zinc-500 max-w-md mb-6">
-                    Drag & drop file PDF, Word, atau TXT di sini. Si Asef akan otomatis membaca dan mempelajarinya sebagai referensi.
+                    Drag & drop file PDF, Word, atau TXT di sini (bisa pilih beberapa file sekaligus). Si Asef akan otomatis membaca dan mempelajarinya sebagai referensi.
                 </p>
+            )}
+            {isUploading && uploadQueue.length > 1 && (
+                <div className="w-full max-w-md mt-2 space-y-1">
+                    {uploadQueue.map((item, idx) => (
+                        <div key={idx} className="flex items-center gap-2 text-xs">
+                            {item.status === 'pending' && <span className="w-2 h-2 rounded-full bg-zinc-300" />}
+                            {item.status === 'uploading' && <Loader2 className="w-3 h-3 animate-spin text-emerald-600" />}
+                            {item.status === 'done' && <CheckCircle2 className="w-3 h-3 text-emerald-600" />}
+                            {item.status === 'error' && <AlertCircle className="w-3 h-3 text-red-500" />}
+                            <span className={item.status === 'error' ? 'text-red-600' : 'text-zinc-600'}>{item.name}</span>
+                        </div>
+                    ))}
+                </div>
             )}
             <button 
                 className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-colors shadow-lg shadow-zinc-900/10 ${isUploading ? 'bg-zinc-400 text-white cursor-not-allowed' : 'bg-zinc-900 text-white hover:bg-emerald-600'}`}
@@ -231,6 +275,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ documents, onUpload, on
                     <input 
                         type="text" 
                         placeholder="Cari dokumen..." 
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
                         className="pl-9 pr-4 py-2 bg-zinc-50 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 w-64"
                     />
                 </div>
