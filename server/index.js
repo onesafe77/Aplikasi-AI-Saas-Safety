@@ -89,25 +89,55 @@ app.post('/api/documents/upload', upload.single('file'), async (req, res) => {
     }
 
     const { originalname, mimetype, size, buffer } = req.file;
+    console.log(`Processing upload: ${originalname} (${mimetype}, ${size} bytes)`);
+    
     let textContent = '';
     let pageCount = 1;
 
     if (mimetype === 'application/pdf') {
-      const pdfData = await pdfParse(buffer);
-      textContent = pdfData.text;
-      pageCount = pdfData.numpages || 1;
+      try {
+        const pdfData = await pdfParse(buffer);
+        textContent = pdfData.text;
+        pageCount = pdfData.numpages || 1;
+        console.log(`PDF parsed: ${pageCount} pages, ${textContent.length} chars extracted`);
+      } catch (pdfError) {
+        console.error('PDF parsing error:', pdfError.message);
+        if (pdfError.message.includes('password') || pdfError.message.includes('encrypted')) {
+          return res.status(400).json({ 
+            error: 'PDF ini terproteksi password. Silakan buka proteksi PDF terlebih dahulu.' 
+          });
+        }
+        return res.status(400).json({ 
+          error: 'Gagal membaca PDF. Pastikan file tidak rusak atau corrupt.' 
+        });
+      }
     } else if (mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 
                mimetype === 'application/msword') {
-      const result = await mammoth.extractRawText({ buffer });
-      textContent = result.value;
+      try {
+        const result = await mammoth.extractRawText({ buffer });
+        textContent = result.value;
+        console.log(`DOCX parsed: ${textContent.length} chars extracted`);
+      } catch (docError) {
+        console.error('DOCX parsing error:', docError.message);
+        return res.status(400).json({ 
+          error: 'Gagal membaca file Word. Pastikan file tidak rusak.' 
+        });
+      }
     } else if (mimetype === 'text/plain') {
       textContent = buffer.toString('utf-8');
+      console.log(`TXT parsed: ${textContent.length} chars`);
     } else {
-      return res.status(400).json({ error: 'Unsupported file type. Use PDF, DOCX, or TXT.' });
+      return res.status(400).json({ error: 'Tipe file tidak didukung. Gunakan PDF, DOCX, atau TXT.' });
     }
 
     if (!textContent.trim()) {
-      return res.status(400).json({ error: 'Could not extract text from file' });
+      console.log('No text content extracted from file');
+      if (mimetype === 'application/pdf') {
+        return res.status(400).json({ 
+          error: 'PDF ini tidak mengandung teks (kemungkinan hasil scan/gambar). Si Asef belum bisa membaca PDF hasil scan. Silakan gunakan PDF dengan teks yang bisa di-copy atau konversi dengan OCR terlebih dahulu.' 
+        });
+      }
+      return res.status(400).json({ error: 'Tidak dapat mengekstrak teks dari file.' });
     }
 
     const fileSize = size < 1024 ? `${size} B` : 
