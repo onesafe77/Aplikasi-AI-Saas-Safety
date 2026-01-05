@@ -48,7 +48,15 @@ The application uses a secure backend proxy pattern:
 - API key is never exposed to the client
 - Vite dev server proxies `/api` requests to the backend
 
-## Recent Changes (December 23, 2025)
+## Recent Changes (January 5, 2026)
+1. **Dynamic Folder Management**: Admin sekarang bisa menambah, edit, dan hapus folder secara dinamis
+   - Folder disimpan di database PostgreSQL (tabel `folders`)
+   - Default 4 folder otomatis dibuat saat pertama kali: Permenaker, PP, UU, Umum
+   - Inline editing dengan hover untuk tombol edit/delete
+   - Dokumen otomatis dipindahkan ke "Umum" jika folder dihapus
+   - Minimal 1 folder harus ada
+
+## Previous Changes (December 23, 2025)
 1. **Interactive AI**: AI sekarang selalu menawarkan untuk menjelaskan lebih detail tentang topik di akhir setiap jawaban
 2. **Multi-file Upload**: Bisa upload beberapa file sekaligus dengan status tracking per file
 3. **Document Search Filter**: Kotak pencarian di admin dashboard sekarang berfungsi untuk filter dokumen
