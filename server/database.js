@@ -70,6 +70,29 @@ export async function initDatabase() {
       CREATE INDEX IF NOT EXISTS idx_messages_session_id ON chat_messages(session_id);
     `);
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS folders (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(100) NOT NULL UNIQUE,
+        description VARCHAR(255),
+        icon VARCHAR(50) DEFAULT 'folder',
+        sort_order INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    const folderCount = await client.query(`SELECT COUNT(*) FROM folders`);
+    if (parseInt(folderCount.rows[0].count) === 0) {
+      await client.query(`
+        INSERT INTO folders (name, sort_order) VALUES 
+        ('Peraturan Pemerintah', 1),
+        ('SOP GECL', 2),
+        ('SOP BIB', 3),
+        ('Umum', 4)
+        ON CONFLICT (name) DO NOTHING
+      `);
+    }
+
     console.log('Database tables initialized');
   } finally {
     client.release();
@@ -196,6 +219,42 @@ export async function getChatMessages(sessionId) {
 
 export async function deleteChatSession(sessionId) {
   await pool.query(`DELETE FROM chat_sessions WHERE id = $1`, [sessionId]);
+}
+
+export async function getAllFolders() {
+  const result = await pool.query(
+    `SELECT id, name, description, icon, sort_order, created_at FROM folders ORDER BY sort_order, name`
+  );
+  return result.rows;
+}
+
+export async function createFolder(name, description = null) {
+  const maxOrder = await pool.query(`SELECT COALESCE(MAX(sort_order), 0) + 1 as next_order FROM folders`);
+  const result = await pool.query(
+    `INSERT INTO folders (name, description, sort_order) VALUES ($1, $2, $3) RETURNING *`,
+    [name, description, maxOrder.rows[0].next_order]
+  );
+  return result.rows[0];
+}
+
+export async function updateFolder(id, name, description = null) {
+  const result = await pool.query(
+    `UPDATE folders SET name = $1, description = $2 WHERE id = $3 RETURNING *`,
+    [name, description, id]
+  );
+  return result.rows[0];
+}
+
+export async function deleteFolder(id) {
+  const folder = await pool.query(`SELECT name FROM folders WHERE id = $1`, [id]);
+  if (folder.rows.length > 0) {
+    await pool.query(`UPDATE documents SET folder = 'Umum' WHERE folder = $1`, [folder.rows[0].name]);
+  }
+  await pool.query(`DELETE FROM folders WHERE id = $1`, [id]);
+}
+
+export async function updateDocumentsFolder(oldFolderName, newFolderName) {
+  await pool.query(`UPDATE documents SET folder = $1 WHERE folder = $2`, [newFolderName, oldFolderName]);
 }
 
 export { pool };
