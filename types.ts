@@ -45,5 +45,14 @@ export interface UploadedDocument {
   folder?: string;
 }
 
+export interface Folder {
+  id: number;
+  name: string;
+  description?: string;
+  icon?: string;
+  sort_order: number;
+  created_at?: string;
+}
+
 export type LoadingState = 'idle' | 'streaming' | 'error';
 export type ViewState = 'landing' | 'login' | 'chat' | 'admin';

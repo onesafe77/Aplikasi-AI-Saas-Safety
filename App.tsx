@@ -8,7 +8,7 @@ import Login from './components/Login';
 import AdminDashboard from './components/AdminDashboard';
 import SourcePanel from './components/SourcePanel';
 import { UpgradeModal, SettingsModal } from './components/Modals';
-import { Message, Role, ChatSession, LoadingState, User, UploadedDocument, ViewState, Source } from './types';
+import { Message, Role, ChatSession, LoadingState, User, UploadedDocument, ViewState, Source, Folder } from './types';
 import { sendMessageToGemini, initializeChat, updateChatContext, uploadDocument, getDocuments, deleteDocumentApi } from './services/gemini';
 import { SourceInfo } from './components/CitationBubble';
 
@@ -16,6 +16,7 @@ function App() {
   const [currentView, setCurrentView] = useState<ViewState>('login');
   const [messages, setMessages] = useState<Message[]>([]);
   const [documents, setDocuments] = useState<UploadedDocument[]>([]);
+  const [folders, setFolders] = useState<Folder[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [loadingState, setLoadingState] = useState<LoadingState>('idle');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -72,7 +73,8 @@ function App() {
           type: d.file_type,
           content: '',
           uploadDate: new Date(d.created_at).getTime(),
-          size: d.file_size
+          size: d.file_size,
+          folder: d.folder
         })));
       } catch (error) {
         console.error('Failed to load documents:', error);
@@ -98,6 +100,71 @@ function App() {
     };
     loadSessions();
   }, []);
+
+  // Load folders from database
+  useEffect(() => {
+    loadFolders();
+  }, []);
+
+  const loadFolders = async () => {
+    try {
+      const res = await fetch('/api/folders');
+      const data = await res.json();
+      setFolders(data);
+    } catch (error) {
+      console.error('Failed to load folders:', error);
+    }
+  };
+
+  const handleFolderCreate = async (name: string) => {
+    const res = await fetch('/api/folders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error);
+    }
+    await loadFolders();
+  };
+
+  const handleFolderUpdate = async (id: number, name: string, oldName: string) => {
+    const res = await fetch(`/api/folders/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, oldName })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error);
+    }
+    await loadFolders();
+    await refreshDocuments();
+  };
+
+  const handleFolderDelete = async (id: number) => {
+    const res = await fetch(`/api/folders/${id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error);
+    }
+    await loadFolders();
+    await refreshDocuments();
+  };
+
+  const refreshDocuments = async () => {
+    const docs = await getDocuments();
+    setDocuments(docs.map((d: any) => ({
+      id: d.id.toString(),
+      name: d.name || d.original_name,
+      type: d.file_type,
+      content: '',
+      uploadDate: new Date(d.created_at).getTime(),
+      size: d.file_size,
+      folder: d.folder
+    })));
+  };
 
   const scrollToBottom = () => {
     if (scrollRef.current) {
@@ -332,9 +399,13 @@ function App() {
       return (
           <AdminDashboard 
             documents={documents}
+            folders={folders}
             onUpload={handleDocumentUpload}
             onDelete={handleDeleteDocument}
             onLogout={handleLogout}
+            onFolderCreate={handleFolderCreate}
+            onFolderUpdate={handleFolderUpdate}
+            onFolderDelete={handleFolderDelete}
           />
       );
   }

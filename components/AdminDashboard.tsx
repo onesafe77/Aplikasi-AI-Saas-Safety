@@ -1,22 +1,22 @@
-import React, { useState, useRef } from 'react';
-import { UploadCloud, FileText, Trash2, Search, CheckCircle2, Database, AlertCircle, LogOut, Loader2, FolderOpen, ChevronDown, ChevronRight, FileType, HardDrive } from 'lucide-react';
-import { UploadedDocument } from '../types';
-
-const FOLDERS = [
-  'Peraturan Pemerintah',
-  'SOP GECL',
-  'SOP BIB',
-  'Umum'
-];
+import React, { useState, useRef, useEffect } from 'react';
+import { UploadCloud, FileText, Trash2, Search, CheckCircle2, Database, AlertCircle, LogOut, Loader2, FolderOpen, ChevronDown, ChevronRight, FileType, HardDrive, Plus, Pencil, X } from 'lucide-react';
+import { UploadedDocument, Folder } from '../types';
 
 interface AdminDashboardProps {
   documents: UploadedDocument[];
+  folders: Folder[];
   onUpload: (file: File, folder: string, onProgress?: (percent: number) => void) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onLogout: () => void;
+  onFolderCreate: (name: string) => Promise<void>;
+  onFolderUpdate: (id: number, name: string, oldName: string) => Promise<void>;
+  onFolderDelete: (id: number) => Promise<void>;
 }
 
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ documents, onUpload, onDelete, onLogout }) => {
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
+  documents, folders, onUpload, onDelete, onLogout, 
+  onFolderCreate, onFolderUpdate, onFolderDelete 
+}) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -24,10 +24,34 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ documents, onUpload, on
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [selectedFolder, setSelectedFolder] = useState('Peraturan Pemerintah');
-  const [expandedFolders, setExpandedFolders] = useState<string[]>(FOLDERS);
+  const [selectedFolder, setSelectedFolder] = useState('');
+  const [expandedFolders, setExpandedFolders] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showAddFolder, setShowAddFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [editingFolder, setEditingFolder] = useState<{id: number; name: string; oldName: string} | null>(null);
+  const [folderError, setFolderError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (folders && folders.length > 0) {
+      if (!selectedFolder) {
+        setSelectedFolder(folders[0].name);
+      }
+      setExpandedFolders(folders.map(f => f.name));
+    }
+  }, [folders]);
+
+  if (!folders || folders.length === 0) {
+    return (
+      <div className="flex-1 bg-zinc-50 h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-zinc-500">Memuat folder...</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -136,7 +160,55 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ documents, onUpload, on
     }
   };
 
-  const totalSize = documents.length * 15; // Mock size calculation
+  const handleAddFolder = async () => {
+    if (!newFolderName.trim()) return;
+    setFolderError(null);
+    try {
+      await onFolderCreate(newFolderName.trim());
+      setNewFolderName('');
+      setShowAddFolder(false);
+    } catch (error: any) {
+      setFolderError(error.message || 'Gagal menambah folder');
+    }
+  };
+
+  const handleUpdateFolder = async () => {
+    if (!editingFolder || !editingFolder.name.trim()) return;
+    setFolderError(null);
+    try {
+      await onFolderUpdate(editingFolder.id, editingFolder.name.trim(), editingFolder.oldName);
+      if (selectedFolder === editingFolder.oldName) {
+        setSelectedFolder(editingFolder.name.trim());
+      }
+      setEditingFolder(null);
+    } catch (error: any) {
+      setFolderError(error.message || 'Gagal mengupdate folder');
+    }
+  };
+
+  const handleDeleteFolder = async (folder: Folder) => {
+    if (folders.length <= 1) {
+      setFolderError('Minimal harus ada 1 folder');
+      return;
+    }
+    const docsInFolder = documents.filter(d => d.folder === folder.name).length;
+    const confirm = docsInFolder > 0 
+      ? window.confirm(`Folder "${folder.name}" memiliki ${docsInFolder} dokumen. Dokumen akan dipindahkan ke folder "Umum". Lanjutkan?`)
+      : window.confirm(`Hapus folder "${folder.name}"?`);
+    if (confirm) {
+      try {
+        await onFolderDelete(folder.id);
+        if (selectedFolder === folder.name) {
+          setSelectedFolder(folders.find(f => f.id !== folder.id)?.name || '');
+        }
+      } catch (error: any) {
+        setFolderError(error.message || 'Gagal menghapus folder');
+      }
+    }
+  };
+
+  const folderNames = folders.map(f => f.name);
+  const totalSize = documents.length * 15;
 
   return (
     <div className="flex-1 bg-zinc-50 h-screen overflow-y-auto p-8 font-sans">
@@ -166,21 +238,91 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ documents, onUpload, on
         {/* Folder Selection */}
         <div className="mb-6">
             <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2 block">Pilih Folder Tujuan</label>
-            <div className="flex gap-2 flex-wrap">
-                {FOLDERS.map((folder) => (
-                    <button
-                        key={folder}
-                        onClick={() => setSelectedFolder(folder)}
-                        className={`px-4 py-2 rounded-xl font-medium text-sm transition-all flex items-center gap-2 ${
-                            selectedFolder === folder 
-                                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30' 
-                                : 'bg-white border border-zinc-200 text-zinc-600 hover:border-emerald-400 hover:text-emerald-600'
-                        }`}
-                    >
-                        <FolderOpen className="w-4 h-4" />
-                        {folder}
-                    </button>
+            {folderError && (
+              <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm flex items-center gap-2">
+                <AlertCircle className="w-4 h-4" />
+                {folderError}
+                <button onClick={() => setFolderError(null)} className="ml-auto"><X className="w-4 h-4" /></button>
+              </div>
+            )}
+            <div className="flex gap-2 flex-wrap items-center">
+                {folders.map((folder) => (
+                    <div key={folder.id} className="relative group">
+                      {editingFolder?.id === folder.id ? (
+                        <div className="flex items-center gap-1 bg-white border border-emerald-400 rounded-xl px-2 py-1">
+                          <input
+                            type="text"
+                            value={editingFolder.name}
+                            onChange={(e) => setEditingFolder({...editingFolder, name: e.target.value})}
+                            className="w-32 px-2 py-1 text-sm border-none outline-none"
+                            autoFocus
+                            onKeyDown={(e) => e.key === 'Enter' && handleUpdateFolder()}
+                          />
+                          <button onClick={handleUpdateFolder} className="p-1 hover:bg-emerald-100 rounded text-emerald-600">
+                            <CheckCircle2 className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => setEditingFolder(null)} className="p-1 hover:bg-zinc-100 rounded text-zinc-500">
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                            onClick={() => setSelectedFolder(folder.name)}
+                            className={`px-4 py-2 rounded-xl font-medium text-sm transition-all flex items-center gap-2 ${
+                                selectedFolder === folder.name 
+                                    ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30' 
+                                    : 'bg-white border border-zinc-200 text-zinc-600 hover:border-emerald-400 hover:text-emerald-600'
+                            }`}
+                        >
+                            <FolderOpen className="w-4 h-4" />
+                            {folder.name}
+                        </button>
+                      )}
+                      {!editingFolder && (
+                        <div className="absolute -top-2 -right-2 hidden group-hover:flex gap-0.5">
+                          <button 
+                            onClick={(e) => {e.stopPropagation(); setEditingFolder({id: folder.id, name: folder.name, oldName: folder.name})}}
+                            className="p-1 bg-white border border-zinc-200 rounded-full shadow-sm hover:bg-zinc-50"
+                          >
+                            <Pencil className="w-3 h-3 text-zinc-500" />
+                          </button>
+                          <button 
+                            onClick={(e) => {e.stopPropagation(); handleDeleteFolder(folder)}}
+                            className="p-1 bg-white border border-zinc-200 rounded-full shadow-sm hover:bg-red-50"
+                          >
+                            <Trash2 className="w-3 h-3 text-zinc-500 hover:text-red-500" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
                 ))}
+                {showAddFolder ? (
+                  <div className="flex items-center gap-1 bg-white border border-emerald-400 rounded-xl px-2 py-1">
+                    <input
+                      type="text"
+                      value={newFolderName}
+                      onChange={(e) => setNewFolderName(e.target.value)}
+                      placeholder="Nama folder..."
+                      className="w-32 px-2 py-1 text-sm border-none outline-none"
+                      autoFocus
+                      onKeyDown={(e) => e.key === 'Enter' && handleAddFolder()}
+                    />
+                    <button onClick={handleAddFolder} className="p-1 hover:bg-emerald-100 rounded text-emerald-600">
+                      <CheckCircle2 className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => {setShowAddFolder(false); setNewFolderName('')}} className="p-1 hover:bg-zinc-100 rounded text-zinc-500">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowAddFolder(true)}
+                    className="px-3 py-2 rounded-xl font-medium text-sm border-2 border-dashed border-zinc-300 text-zinc-500 hover:border-emerald-400 hover:text-emerald-600 transition-all flex items-center gap-1"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Folder Baru
+                  </button>
+                )}
             </div>
         </div>
 
@@ -291,7 +433,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ documents, onUpload, on
                 </div>
             ) : (
                 <div className="divide-y divide-zinc-100">
-                    {FOLDERS.map((folder) => {
+                    {folderNames.map((folder) => {
                         const folderDocs = getDocumentsByFolder(folder);
                         if (folderDocs.length === 0) return null;
                         const isExpanded = expandedFolders.includes(folder);
