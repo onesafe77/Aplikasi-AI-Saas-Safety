@@ -64,7 +64,12 @@ import {
   getChatSession,
   saveChatMessage,
   getChatMessages,
-  deleteChatSession
+  deleteChatSession,
+  getAllFolders,
+  createFolder,
+  updateFolder,
+  deleteFolder,
+  updateDocumentsFolder
 } from './database.js';
 import { 
   chunkText, 
@@ -261,6 +266,63 @@ app.delete('/api/documents/:id', async (req, res) => {
   } catch (error) {
     console.error('Delete error:', error);
     res.status(500).json({ error: 'Failed to delete document' });
+  }
+});
+
+app.get('/api/folders', async (req, res) => {
+  try {
+    const folders = await getAllFolders();
+    res.json(folders);
+  } catch (error) {
+    console.error('Get folders error:', error);
+    res.status(500).json({ error: 'Failed to get folders' });
+  }
+});
+
+app.post('/api/folders', async (req, res) => {
+  try {
+    const { name, description } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Nama folder harus diisi' });
+    }
+    const folder = await createFolder(name.trim(), description);
+    res.json(folder);
+  } catch (error) {
+    console.error('Create folder error:', error);
+    if (error.code === '23505') {
+      return res.status(400).json({ error: 'Folder dengan nama tersebut sudah ada' });
+    }
+    res.status(500).json({ error: 'Failed to create folder' });
+  }
+});
+
+app.put('/api/folders/:id', async (req, res) => {
+  try {
+    const { name, description, oldName } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Nama folder harus diisi' });
+    }
+    const folder = await updateFolder(req.params.id, name.trim(), description);
+    if (oldName && oldName !== name.trim()) {
+      await updateDocumentsFolder(oldName, name.trim());
+    }
+    res.json(folder);
+  } catch (error) {
+    console.error('Update folder error:', error);
+    if (error.code === '23505') {
+      return res.status(400).json({ error: 'Folder dengan nama tersebut sudah ada' });
+    }
+    res.status(500).json({ error: 'Failed to update folder' });
+  }
+});
+
+app.delete('/api/folders/:id', async (req, res) => {
+  try {
+    await deleteFolder(req.params.id);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete folder error:', error);
+    res.status(500).json({ error: 'Failed to delete folder' });
   }
 });
 
