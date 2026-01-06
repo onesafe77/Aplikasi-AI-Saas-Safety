@@ -588,7 +588,8 @@ app.get('/api/spotlight', async (req, res) => {
 
 app.get('/api/sessions', async (req, res) => {
   try {
-    const sessions = await getChatSessions();
+    const userId = req.query.userId || null;
+    const sessions = await getChatSessions(userId);
     res.json(sessions);
   } catch (error) {
     console.error('Get sessions error:', error);
@@ -598,8 +599,8 @@ app.get('/api/sessions', async (req, res) => {
 
 app.post('/api/sessions', async (req, res) => {
   try {
-    const { id, title } = req.body;
-    await createChatSession(id, title || 'Chat Baru');
+    const { id, title, userId } = req.body;
+    await createChatSession(id, title || 'Chat Baru', userId);
     res.json({ success: true, id });
   } catch (error) {
     console.error('Create session error:', error);

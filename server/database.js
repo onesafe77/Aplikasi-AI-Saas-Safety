@@ -204,6 +204,15 @@ export async function createChatSession(id, title, userId = null) {
 }
 
 export async function getChatSessions(userId = null) {
+  if (userId) {
+    const result = await pool.query(
+      `SELECT id, title, created_at, updated_at FROM chat_sessions 
+       WHERE user_id = $1
+       ORDER BY updated_at DESC LIMIT 50`,
+      [userId]
+    );
+    return result.rows;
+  }
   const result = await pool.query(
     `SELECT id, title, created_at, updated_at FROM chat_sessions 
      ORDER BY updated_at DESC LIMIT 50`

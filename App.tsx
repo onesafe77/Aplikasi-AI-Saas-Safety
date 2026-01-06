@@ -85,10 +85,17 @@ function App() {
   }, []);
 
   // Load chat sessions from database
+  const getUserNik = () => {
+    if (!currentUser?.email) return null;
+    return currentUser.email.split('@')[0];
+  };
+
   useEffect(() => {
     const loadSessions = async () => {
       try {
-        const res = await fetch('/api/sessions');
+        const userNik = getUserNik();
+        const url = userNik ? `/api/sessions?userId=${userNik}` : '/api/sessions';
+        const res = await fetch(url);
         const data = await res.json();
         setSessions(data.map((s: any) => ({
           id: s.id,
@@ -99,8 +106,12 @@ function App() {
         console.error('Failed to load sessions:', error);
       }
     };
-    loadSessions();
-  }, []);
+    if (currentUser) {
+      loadSessions();
+    } else {
+      setSessions([]);
+    }
+  }, [currentUser]);
 
   // Load folders from database
   useEffect(() => {
@@ -213,13 +224,15 @@ function App() {
     
     // Create session in database
     try {
+      const userNik = getUserNik();
       await fetch('/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: newId, title: 'Chat Baru' })
+        body: JSON.stringify({ id: newId, title: 'Chat Baru', userId: userNik })
       });
       // Refresh sessions
-      const res = await fetch('/api/sessions');
+      const url = userNik ? `/api/sessions?userId=${userNik}` : '/api/sessions';
+      const res = await fetch(url);
       const data = await res.json();
       setSessions(data.map((s: any) => ({
         id: s.id,
@@ -310,10 +323,11 @@ function App() {
       sessionId = `chat_${Date.now()}`;
       setCurrentSessionId(sessionId);
       try {
+        const userNik = getUserNik();
         await fetch('/api/sessions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: sessionId, title: text.substring(0, 50) })
+          body: JSON.stringify({ id: sessionId, title: text.substring(0, 50), userId: userNik })
         });
       } catch (e) {
         console.error('Failed to create session:', e);
@@ -346,7 +360,9 @@ function App() {
           body: JSON.stringify({ title: text.substring(0, 50) })
         }).then(() => {
           // Refresh sessions list
-          fetch('/api/sessions')
+          const userNik = getUserNik();
+          const url = userNik ? `/api/sessions?userId=${userNik}` : '/api/sessions';
+          fetch(url)
             .then(res => res.json())
             .then(data => setSessions(data.map((s: any) => ({
               id: s.id,
@@ -509,8 +525,8 @@ function App() {
                 {/* Top Section: Spotlight & Library */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
                 
-                {/* Spotlight Card (Dark) */}
-                <div className="lg:col-span-2 bg-zinc-900 rounded-[2rem] p-8 relative overflow-hidden text-white flex flex-col justify-between min-h-[280px] shadow-xl group">
+                {/* Spotlight Card (Dark) - Always visible */}
+                <div className="lg:col-span-2 bg-zinc-900 rounded-[2rem] p-6 md:p-8 relative overflow-hidden text-white flex flex-col justify-between min-h-[240px] md:min-h-[280px] shadow-xl group">
                     <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-emerald-900/40 rounded-full blur-[100px] pointer-events-none"></div>
                     <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-blue-900/20 rounded-full blur-[80px] pointer-events-none"></div>
                     
@@ -540,8 +556,8 @@ function App() {
                     <Scale className="absolute right-8 bottom-8 w-32 h-32 text-white/5 rotate-12" />
                 </div>
 
-                {/* Regulation Library (List) */}
-                <div className="bg-white rounded-[2rem] border border-zinc-200 p-6 flex flex-col h-full shadow-sm">
+                {/* Regulation Library (List) - Hidden on mobile */}
+                <div className="hidden lg:flex bg-white rounded-[2rem] border border-zinc-200 p-6 flex-col h-full shadow-sm">
                     <div className="flex items-center gap-2 mb-6">
                         <BookOpen className="w-5 h-5 text-blue-600" />
                         <h3 className="font-bold text-zinc-900">Pustaka Regulasi</h3>
@@ -570,11 +586,11 @@ function App() {
                 </div>
                 </div>
 
-                {/* Feature Cards Row */}
-                <div className="mb-4 text-sm font-bold text-zinc-500 flex items-center gap-2">
+                {/* Feature Cards Row - Hidden on mobile */}
+                <div className="hidden md:flex mb-4 text-sm font-bold text-zinc-500 items-center gap-2">
                     <Search className="w-4 h-4" /> Penelusuran Hukum
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-20">
+                <div className="hidden md:grid grid-cols-1 md:grid-cols-3 gap-4 mb-20">
                     <button 
                     onClick={() => handleSendMessage("Carikan dasar hukum tentang...")}
                     className="bg-white p-5 rounded-2xl border border-zinc-200 hover:border-blue-400 hover:shadow-lg hover:shadow-blue-500/5 transition-all text-left group"
