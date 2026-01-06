@@ -231,6 +231,19 @@ function App() {
     }
   };
 
+  const handleDeleteSession = async (id: string) => {
+    try {
+      await fetch(`/api/sessions/${id}`, { method: 'DELETE' });
+      setSessions(prev => prev.filter(s => s.id !== id));
+      if (currentSessionId === id) {
+        setCurrentSessionId(null);
+        setMessages([]);
+      }
+    } catch (error) {
+      console.error('Failed to delete session:', error);
+    }
+  };
+
   const handleLoadSession = async (id: string) => {
     setCurrentSessionId(id);
     setLoadingState('idle');
@@ -437,7 +450,7 @@ function App() {
         user={currentUser}
         onNewChat={handleNewChat}
         onLoadSession={handleLoadSession}
-        onOpenUpgrade={() => setShowUpgradeModal(true)}
+        onDeleteSession={handleDeleteSession}
         onOpenSettings={() => setShowSettingsModal(true)}
         onLogout={handleLogout}
       />
@@ -475,13 +488,6 @@ function App() {
                 <div className="hidden md:flex items-center gap-1 text-xs font-medium text-zinc-400 uppercase tracking-widest">
                 <span>HOME</span>
                 </div>
-                <button 
-                onClick={() => setShowUpgradeModal(true)}
-                className="flex items-center gap-1.5 bg-amber-100 hover:bg-amber-200 text-amber-700 px-3 py-1.5 rounded-full text-xs font-bold transition-colors"
-                >
-                <Sparkles className="w-3 h-3 fill-amber-700" />
-                UPGRADE
-                </button>
             </div>
         </header>
 

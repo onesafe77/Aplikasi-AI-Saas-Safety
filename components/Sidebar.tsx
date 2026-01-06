@@ -1,5 +1,5 @@
-import React from 'react';
-import { Plus, MessageSquare, Settings, ShieldCheck, X, Zap, LogOut, Database } from 'lucide-react';
+import React, { useState } from 'react';
+import { Plus, MessageSquare, Settings, ShieldCheck, X, Trash2 } from 'lucide-react';
 import { ChatSession, User } from '../types';
 
 interface SidebarProps {
@@ -9,7 +9,7 @@ interface SidebarProps {
   user: User | null;
   onNewChat: () => void;
   onLoadSession: (id: string) => void;
-  onOpenUpgrade: () => void;
+  onDeleteSession: (id: string) => void;
   onOpenSettings: () => void;
   onLogout: () => void;
 }
@@ -20,11 +20,23 @@ const Sidebar: React.FC<SidebarProps> = ({
   sessions, 
   user,
   onNewChat, 
-  onLoadSession, 
-  onOpenUpgrade, 
+  onLoadSession,
+  onDeleteSession,
   onOpenSettings,
   onLogout
 }) => {
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+
+  const handleDeleteClick = (e: React.MouseEvent, sessionId: string) => {
+    e.stopPropagation();
+    setDeleteConfirm(sessionId);
+  };
+
+  const confirmDelete = (sessionId: string) => {
+    onDeleteSession(sessionId);
+    setDeleteConfirm(null);
+  };
+
   return (
     <>
       {/* Mobile Overlay */}
@@ -82,16 +94,43 @@ const Sidebar: React.FC<SidebarProps> = ({
             ) : (
               <ul className="space-y-1">
                 {sessions.map((session) => (
-                  <li key={session.id}>
-                    <button 
-                      onClick={() => onLoadSession(session.id)}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-zinc-100 transition-colors text-left group"
-                    >
-                      <MessageSquare className="w-4 h-4 text-zinc-300 group-hover:text-emerald-600 transition-colors" />
-                      <span className="text-[13px] truncate text-zinc-600 group-hover:text-zinc-900 font-medium">
-                        {session.title}
-                      </span>
-                    </button>
+                  <li key={session.id} className="relative group">
+                    {deleteConfirm === session.id ? (
+                      <div className="flex items-center gap-2 px-3 py-2.5 bg-red-50 rounded-lg border border-red-200">
+                        <span className="text-xs text-red-600 flex-1">Hapus chat ini?</span>
+                        <button 
+                          onClick={() => confirmDelete(session.id)}
+                          className="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
+                        >
+                          Ya
+                        </button>
+                        <button 
+                          onClick={() => setDeleteConfirm(null)}
+                          className="px-2 py-1 bg-zinc-200 text-zinc-600 text-xs rounded hover:bg-zinc-300"
+                        >
+                          Batal
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center">
+                        <button 
+                          onClick={() => onLoadSession(session.id)}
+                          className="flex-1 flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-zinc-100 transition-colors text-left"
+                        >
+                          <MessageSquare className="w-4 h-4 text-zinc-300 group-hover:text-emerald-600 transition-colors" />
+                          <span className="text-[13px] truncate text-zinc-600 group-hover:text-zinc-900 font-medium">
+                            {session.title}
+                          </span>
+                        </button>
+                        <button
+                          onClick={(e) => handleDeleteClick(e, session.id)}
+                          className="p-2 opacity-0 group-hover:opacity-100 text-zinc-400 hover:text-red-500 transition-all"
+                          title="Hapus chat"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -102,28 +141,6 @@ const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Footer */}
         <div className="p-5 bg-[#FAFAF9] space-y-3 w-[280px]">
-            
-            {/* Upgrade Card */}
-             <div className="p-4 rounded-2xl bg-gradient-to-br from-zinc-900 to-zinc-800 text-white relative overflow-hidden group cursor-pointer shadow-lg shadow-zinc-900/20" onClick={onOpenUpgrade}>
-                <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/20 rounded-full blur-2xl group-hover:bg-emerald-500/30 transition-colors"></div>
-                <div className="relative z-10">
-                    <div className="flex justify-between items-start mb-2">
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">Starter Plan</span>
-                        <span className="text-[10px] text-zinc-400">3/5 Chats</span>
-                    </div>
-                    
-                    {/* Progress Bar */}
-                    <div className="w-full h-1.5 bg-white/10 rounded-full mb-4 overflow-hidden">
-                        <div className="h-full w-[60%] bg-emerald-500 rounded-full"></div>
-                    </div>
-
-                    <button className="w-full py-2 bg-white text-zinc-900 rounded-lg text-xs font-bold hover:bg-emerald-50 transition-colors flex items-center justify-center gap-2">
-                        <Zap className="w-3 h-3 fill-emerald-500 text-emerald-500" />
-                        Upgrade to Pro
-                    </button>
-                </div>
-            </div>
-
             <div className="border-t border-zinc-200 pt-3">
                 <div className="flex items-center justify-between group px-2 py-1">
                     <div className="flex items-center gap-3">
