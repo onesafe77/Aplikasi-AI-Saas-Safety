@@ -111,7 +111,7 @@ function App() {
     } else {
       setSessions([]);
     }
-  }, [currentUser]);
+  }, [currentUser?.email]);
 
   // Load folders from database
   useEffect(() => {
