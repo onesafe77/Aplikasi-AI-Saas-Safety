@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { ShieldCheck, Lock, Eye, EyeOff, ArrowRight, Loader2, ShieldAlert, IdCard, Mail } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { ShieldCheck, Lock, Eye, EyeOff, ArrowRight, Loader2, ShieldAlert, IdCard } from 'lucide-react';
 import { User as UserType } from '../types';
 
 interface LoginProps {
@@ -10,9 +10,12 @@ interface Confetti {
   id: number;
   x: number;
   y: number;
+  vx: number;
+  vy: number;
   color: string;
   size: number;
   rotation: number;
+  rotationSpeed: number;
   shape: 'rect' | 'circle' | 'line';
 }
 
@@ -24,7 +27,9 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const [error, setError] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [confetti, setConfetti] = useState<Confetti[]>([]);
+  const animationRef = useRef<number | null>(null);
 
+  // Initialize confetti with physics properties
   useEffect(() => {
     const colors = [
       '#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6', 
@@ -33,17 +38,74 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     
     const shapes: ('rect' | 'circle' | 'line')[] = ['rect', 'circle', 'line'];
     
-    const particles: Confetti[] = Array.from({ length: 80 }, (_, i) => ({
+    const particles: Confetti[] = Array.from({ length: 60 }, (_, i) => ({
       id: i,
       x: Math.random() * 100,
       y: Math.random() * 100,
+      vx: (Math.random() - 0.5) * 0.3,
+      vy: (Math.random() - 0.5) * 0.3,
       color: colors[Math.floor(Math.random() * colors.length)],
       size: 4 + Math.random() * 8,
       rotation: Math.random() * 360,
+      rotationSpeed: (Math.random() - 0.5) * 1,
       shape: shapes[Math.floor(Math.random() * shapes.length)],
     }));
     
     setConfetti(particles);
+  }, []);
+
+  // Physics animation loop
+  useEffect(() => {
+    const animate = () => {
+      setConfetti(prev => prev.map(c => {
+        let newX = c.x + c.vx;
+        let newY = c.y + c.vy;
+        let newVx = c.vx;
+        let newVy = c.vy;
+        let newRotation = c.rotation + c.rotationSpeed;
+
+        // Add slight random movement for floating effect
+        newVx += (Math.random() - 0.5) * 0.02;
+        newVy += (Math.random() - 0.5) * 0.02;
+
+        // Apply friction
+        newVx *= 0.999;
+        newVy *= 0.999;
+
+        // Limit velocity
+        const maxSpeed = 0.4;
+        const speed = Math.sqrt(newVx * newVx + newVy * newVy);
+        if (speed > maxSpeed) {
+          newVx = (newVx / speed) * maxSpeed;
+          newVy = (newVy / speed) * maxSpeed;
+        }
+
+        // Edge wrapping (wrap around screen)
+        if (newX < -5) newX = 105;
+        if (newX > 105) newX = -5;
+        if (newY < -5) newY = 105;
+        if (newY > 105) newY = -5;
+
+        return {
+          ...c,
+          x: newX,
+          y: newY,
+          vx: newVx,
+          vy: newVy,
+          rotation: newRotation,
+        };
+      }));
+
+      animationRef.current = requestAnimationFrame(animate);
+    };
+
+    animationRef.current = requestAnimationFrame(animate);
+    
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -88,18 +150,23 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   };
 
   const renderConfettiShape = (c: Confetti) => {
+    const baseStyle: React.CSSProperties = {
+      left: `${c.x}%`,
+      top: `${c.y}%`,
+      backgroundColor: c.color,
+      transform: `rotate(${c.rotation}deg)`,
+      transition: 'none',
+    };
+
     if (c.shape === 'circle') {
       return (
         <div
           key={c.id}
-          className="absolute rounded-full opacity-60"
+          className="absolute rounded-full opacity-70"
           style={{
-            left: `${c.x}%`,
-            top: `${c.y}%`,
+            ...baseStyle,
             width: c.size,
             height: c.size,
-            backgroundColor: c.color,
-            transform: `rotate(${c.rotation}deg)`,
           }}
         />
       );
@@ -107,14 +174,11 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       return (
         <div
           key={c.id}
-          className="absolute opacity-60"
+          className="absolute opacity-70"
           style={{
-            left: `${c.x}%`,
-            top: `${c.y}%`,
+            ...baseStyle,
             width: c.size * 2.5,
             height: 3,
-            backgroundColor: c.color,
-            transform: `rotate(${c.rotation}deg)`,
             borderRadius: 2,
           }}
         />
@@ -123,14 +187,11 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       return (
         <div
           key={c.id}
-          className="absolute opacity-60"
+          className="absolute opacity-70"
           style={{
-            left: `${c.x}%`,
-            top: `${c.y}%`,
+            ...baseStyle,
             width: c.size,
             height: c.size * 0.6,
-            backgroundColor: c.color,
-            transform: `rotate(${c.rotation}deg)`,
             borderRadius: 2,
           }}
         />
@@ -141,8 +202,8 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   return (
     <div className="min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-slate-100 flex items-center justify-center p-4 relative overflow-hidden font-sans">
       
-      {/* Confetti Background */}
-      <div className="absolute inset-0 pointer-events-none">
+      {/* Animated Confetti Background */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
         {confetti.map(c => renderConfettiShape(c))}
       </div>
 
