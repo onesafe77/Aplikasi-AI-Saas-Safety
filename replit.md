@@ -49,7 +49,22 @@ The application uses a secure backend proxy pattern:
 - Vite dev server proxies `/api` requests to the backend
 
 ## Recent Changes (January 6, 2026)
-1. **User Management System**: Admin sekarang bisa mengelola user sistem
+1. **Per-User Chat History**: Setiap user sekarang hanya bisa melihat chat history miliknya sendiri
+   - Chat sessions difilter berdasarkan user_id (NIK)
+   - API endpoints `/api/sessions` menerima parameter `userId`
+   - Session baru otomatis dikaitkan dengan user yang sedang login
+
+2. **Mobile Optimization**: Tampilan mobile lebih simpel dan fokus
+   - Hanya menampilkan Spotlight Card dan sapaan user
+   - Pustaka Regulasi dan Penelusuran Hukum disembunyikan di mobile
+   - Responsive padding dan sizing
+
+3. **Citation Tooltip Fix**: Tooltip sitasi tidak lagi terpotong di tepi layar
+   - Menggunakan fixed positioning dengan edge detection
+   - Otomatis menyesuaikan posisi jika terlalu dekat dengan tepi layar
+   - Z-index tinggi untuk mencegah tertutup elemen lain
+
+4. **User Management System**: Admin sekarang bisa mengelola user sistem
    - Tabel user dengan kolom: NIK, Nama, Departemen, Jabatan, Role
    - Tambah, edit, hapus user individual
    - Import user dari file Excel (format: NAMA, NIK, DEPARTEMEN, JABATAN)
@@ -57,12 +72,12 @@ The application uses a secure backend proxy pattern:
    - Login menggunakan autentikasi database
    - Default admin account: NIK=admin, Password=123456
 
-2. **UI Improvements**:
+5. **UI Improvements**:
    - Hapus tampilan plan (STARTER PLAN, progress bar, Upgrade to Pro) dari sidebar
    - Hapus tombol UPGRADE dari header
    - Tambah fitur hapus chat di sidebar dengan konfirmasi
 
-3. **Login Antigravity Effect**:
+6. **Login Antigravity Effect**:
    - Elemen K3 (APD, SOP, APAR, dll) melayang-layang di sisi kanan halaman login
    - CSS animation untuk efek drift dan float
    - Pulse glow effect pada logo
