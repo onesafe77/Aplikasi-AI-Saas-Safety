@@ -1,22 +1,39 @@
-import React, { useState, useEffect } from 'react';
-import { ShieldCheck, Lock, Eye, EyeOff, ArrowRight, Loader2, Quote, ShieldAlert, IdCard, CheckCircle2, FileText, Shield, AlertTriangle, HardHat, Flame, Zap } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { ShieldCheck, Lock, Eye, EyeOff, ArrowRight, Loader2, ShieldAlert, IdCard, FileText, Shield, AlertTriangle, HardHat, Flame, Zap, CheckCircle2, Wrench, Radio } from 'lucide-react';
 import { User as UserType } from '../types';
 
 interface LoginProps {
   onLoginSuccess: (user: UserType) => void;
 }
 
-interface FloatingElement {
+interface PhysicsElement {
   id: number;
-  icon: React.ReactNode;
-  label: string;
   x: number;
   y: number;
+  vx: number;
+  vy: number;
   rotation: number;
-  scale: number;
-  duration: number;
-  delay: number;
+  rotationSpeed: number;
+  width: number;
+  height: number;
+  icon: string;
+  label: string;
+  isDragging: boolean;
+  mass: number;
 }
+
+const ICONS: Record<string, React.ReactNode> = {
+  'shield': <Shield className="w-5 h-5" />,
+  'hardhat': <HardHat className="w-5 h-5" />,
+  'filetext': <FileText className="w-5 h-5" />,
+  'alert': <AlertTriangle className="w-5 h-5" />,
+  'flame': <Flame className="w-5 h-5" />,
+  'zap': <Zap className="w-5 h-5" />,
+  'check': <CheckCircle2 className="w-5 h-5" />,
+  'shieldcheck': <ShieldCheck className="w-5 h-5" />,
+  'wrench': <Wrench className="w-5 h-5" />,
+  'radio': <Radio className="w-5 h-5" />,
+};
 
 const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const [isLoading, setIsLoading] = useState(false);
@@ -24,33 +41,201 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const [nik, setNik] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [floatingElements, setFloatingElements] = useState<FloatingElement[]>([]);
+  
+  const [elements, setElements] = useState<PhysicsElement[]>([]);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ id: number; offsetX: number; offsetY: number; lastX: number; lastY: number } | null>(null);
+  const animationRef = useRef<number | null>(null);
 
+  // Initialize physics elements
   useEffect(() => {
-    const icons = [
-      { icon: <Shield className="w-6 h-6" />, label: 'K3' },
-      { icon: <HardHat className="w-6 h-6" />, label: 'APD' },
-      { icon: <FileText className="w-6 h-6" />, label: 'SOP' },
-      { icon: <AlertTriangle className="w-6 h-6" />, label: 'Bahaya' },
-      { icon: <Flame className="w-6 h-6" />, label: 'APAR' },
-      { icon: <Zap className="w-6 h-6" />, label: 'Listrik' },
-      { icon: <CheckCircle2 className="w-6 h-6" />, label: 'Audit' },
-      { icon: <ShieldCheck className="w-6 h-6" />, label: 'Safety' },
+    const iconData = [
+      { icon: 'shield', label: 'K3' },
+      { icon: 'hardhat', label: 'APD' },
+      { icon: 'filetext', label: 'SOP' },
+      { icon: 'alert', label: 'Bahaya' },
+      { icon: 'flame', label: 'APAR' },
+      { icon: 'zap', label: 'Listrik' },
+      { icon: 'check', label: 'Audit' },
+      { icon: 'shieldcheck', label: 'Safety' },
+      { icon: 'wrench', label: 'P2K3' },
+      { icon: 'radio', label: 'Darurat' },
     ];
 
-    const elements: FloatingElement[] = icons.map((item, i) => ({
+    const initialElements: PhysicsElement[] = iconData.map((item, i) => ({
       id: i,
+      x: 50 + Math.random() * 300,
+      y: 50 + Math.random() * 400,
+      vx: (Math.random() - 0.5) * 2,
+      vy: (Math.random() - 0.5) * 2,
+      rotation: Math.random() * 360,
+      rotationSpeed: (Math.random() - 0.5) * 2,
+      width: 100,
+      height: 44,
       icon: item.icon,
       label: item.label,
-      x: Math.random() * 80 + 10,
-      y: Math.random() * 80 + 10,
-      rotation: Math.random() * 360,
-      scale: 0.8 + Math.random() * 0.4,
-      duration: 15 + Math.random() * 10,
-      delay: Math.random() * -20,
+      isDragging: false,
+      mass: 1,
     }));
 
-    setFloatingElements(elements);
+    setElements(initialElements);
+  }, []);
+
+  // Physics simulation loop
+  useEffect(() => {
+    const friction = 0.995;
+    const bounce = 0.8;
+
+    const simulate = () => {
+      if (!containerRef.current) {
+        animationRef.current = requestAnimationFrame(simulate);
+        return;
+      }
+
+      const containerWidth = containerRef.current.offsetWidth;
+      const containerHeight = containerRef.current.offsetHeight;
+
+      setElements(prev => prev.map(el => {
+        if (el.isDragging) return el;
+
+        let newX = el.x + el.vx;
+        let newY = el.y + el.vy;
+        let newVx = el.vx * friction;
+        let newVy = el.vy * friction;
+        let newRotation = el.rotation + el.rotationSpeed;
+        let newRotationSpeed = el.rotationSpeed * 0.99;
+
+        // Add slight random movement for floating effect
+        newVx += (Math.random() - 0.5) * 0.1;
+        newVy += (Math.random() - 0.5) * 0.1;
+
+        // Edge collision
+        if (newX < 0) {
+          newX = 0;
+          newVx = -newVx * bounce;
+          newRotationSpeed += newVx * 0.5;
+        }
+        if (newX + el.width > containerWidth) {
+          newX = containerWidth - el.width;
+          newVx = -newVx * bounce;
+          newRotationSpeed -= newVx * 0.5;
+        }
+        if (newY < 0) {
+          newY = 0;
+          newVy = -newVy * bounce;
+          newRotationSpeed += newVy * 0.5;
+        }
+        if (newY + el.height > containerHeight) {
+          newY = containerHeight - el.height;
+          newVy = -newVy * bounce;
+          newRotationSpeed -= newVy * 0.5;
+        }
+
+        return {
+          ...el,
+          x: newX,
+          y: newY,
+          vx: newVx,
+          vy: newVy,
+          rotation: newRotation,
+          rotationSpeed: newRotationSpeed,
+        };
+      }));
+
+      // Simple collision detection between elements
+      setElements(prev => {
+        const newElements = [...prev];
+        for (let i = 0; i < newElements.length; i++) {
+          for (let j = i + 1; j < newElements.length; j++) {
+            const a = newElements[i];
+            const b = newElements[j];
+            
+            if (a.isDragging || b.isDragging) continue;
+
+            const dx = (a.x + a.width / 2) - (b.x + b.width / 2);
+            const dy = (a.y + a.height / 2) - (b.y + b.height / 2);
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const minDist = (a.width + b.width) / 2.5;
+
+            if (dist < minDist && dist > 0) {
+              const nx = dx / dist;
+              const ny = dy / dist;
+              const overlap = minDist - dist;
+
+              // Separate elements
+              newElements[i] = { ...a, x: a.x + nx * overlap / 2, y: a.y + ny * overlap / 2 };
+              newElements[j] = { ...b, x: b.x - nx * overlap / 2, y: b.y - ny * overlap / 2 };
+
+              // Exchange velocities (simplified)
+              const dvx = a.vx - b.vx;
+              const dvy = a.vy - b.vy;
+              const dvn = dvx * nx + dvy * ny;
+
+              if (dvn > 0) {
+                newElements[i] = { ...newElements[i], vx: a.vx - dvn * nx * 0.5, vy: a.vy - dvn * ny * 0.5 };
+                newElements[j] = { ...newElements[j], vx: b.vx + dvn * nx * 0.5, vy: b.vy + dvn * ny * 0.5 };
+              }
+            }
+          }
+        }
+        return newElements;
+      });
+
+      animationRef.current = requestAnimationFrame(simulate);
+    };
+
+    animationRef.current = requestAnimationFrame(simulate);
+    return () => {
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+    };
+  }, []);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent, id: number) => {
+    e.preventDefault();
+    const el = elements.find(el => el.id === id);
+    if (!el) return;
+
+    dragRef.current = {
+      id,
+      offsetX: e.clientX - el.x,
+      offsetY: e.clientY - el.y,
+      lastX: e.clientX,
+      lastY: e.clientY,
+    };
+
+    setElements(prev => prev.map(el => 
+      el.id === id ? { ...el, isDragging: true, vx: 0, vy: 0 } : el
+    ));
+  }, [elements]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!dragRef.current || !containerRef.current) return;
+
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const newX = e.clientX - containerRect.left - dragRef.current.offsetX + containerRect.left;
+    const newY = e.clientY - containerRect.top - dragRef.current.offsetY + containerRect.top;
+
+    const velocityX = (e.clientX - dragRef.current.lastX) * 0.5;
+    const velocityY = (e.clientY - dragRef.current.lastY) * 0.5;
+
+    dragRef.current.lastX = e.clientX;
+    dragRef.current.lastY = e.clientY;
+
+    setElements(prev => prev.map(el => 
+      el.id === dragRef.current?.id 
+        ? { ...el, x: e.clientX - containerRect.left - (dragRef.current?.offsetX || 0), y: e.clientY - containerRect.top - (dragRef.current?.offsetY || 0), vx: velocityX, vy: velocityY }
+        : el
+    ));
+  }, []);
+
+  const handleMouseUp = useCallback(() => {
+    if (!dragRef.current) return;
+
+    setElements(prev => prev.map(el => 
+      el.id === dragRef.current?.id ? { ...el, isDragging: false } : el
+    ));
+
+    dragRef.current = null;
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -58,8 +243,8 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     setError('');
     
     if (!nik || !password) {
-        setError('Mohon isi NIK dan password.');
-        return;
+      setError('Mohon isi NIK dan password.');
+      return;
     }
 
     setIsLoading(true);
@@ -97,60 +282,32 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   return (
     <div className="min-h-screen w-full bg-white flex overflow-hidden font-sans">
       <style>{`
-        @keyframes float {
-          0%, 100% {
-            transform: translate(0, 0) rotate(var(--start-rotation));
-          }
-          25% {
-            transform: translate(calc(var(--move-x) * 1px), calc(var(--move-y) * -1px)) rotate(calc(var(--start-rotation) + 90deg));
-          }
-          50% {
-            transform: translate(calc(var(--move-x) * -0.5px), calc(var(--move-y) * 1.5px)) rotate(calc(var(--start-rotation) + 180deg));
-          }
-          75% {
-            transform: translate(calc(var(--move-x) * -1px), calc(var(--move-y) * -0.5px)) rotate(calc(var(--start-rotation) + 270deg));
-          }
-        }
-        
-        @keyframes drift {
-          0%, 100% {
-            transform: translateY(0) rotate(0deg);
-          }
-          33% {
-            transform: translateY(-30px) rotate(5deg);
-          }
-          66% {
-            transform: translateY(20px) rotate(-3deg);
-          }
-        }
-        
         @keyframes pulse-glow {
-          0%, 100% {
-            box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
-          }
-          50% {
-            box-shadow: 0 0 40px rgba(16, 185, 129, 0.6);
-          }
+          0%, 100% { box-shadow: 0 0 20px rgba(16, 185, 129, 0.3); }
+          50% { box-shadow: 0 0 40px rgba(16, 185, 129, 0.6); }
+        }
+        .pulse-glow { animation: pulse-glow 3s ease-in-out infinite; }
+        
+        @keyframes gradient-shift {
+          0%, 100% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
         }
         
-        .floating-element {
-          animation: float var(--duration) ease-in-out infinite;
-          animation-delay: var(--delay);
-          --move-x: 50;
-          --move-y: 30;
+        .physics-element {
+          user-select: none;
+          cursor: grab;
+          transition: box-shadow 0.2s, transform 0.1s;
         }
-        
-        .drift-slow {
-          animation: drift 8s ease-in-out infinite;
+        .physics-element:hover {
+          box-shadow: 0 0 30px rgba(16, 185, 129, 0.5);
         }
-        
-        .drift-medium {
-          animation: drift 6s ease-in-out infinite;
-          animation-delay: -2s;
+        .physics-element:active {
+          cursor: grabbing;
+          transform: scale(1.1);
         }
-        
-        .pulse-glow {
-          animation: pulse-glow 3s ease-in-out infinite;
+        .physics-element.dragging {
+          z-index: 100;
+          box-shadow: 0 0 40px rgba(16, 185, 129, 0.7);
         }
       `}</style>
       
@@ -262,78 +419,56 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         </div>
       </div>
 
-      {/* RIGHT SIDE - Antigravity Floating Elements */}
-      <div className="hidden lg:flex w-[55%] bg-[#09090B] text-white relative items-center justify-center p-16 overflow-hidden">
-        {/* Animated Mesh Gradient Background */}
-        <div className="absolute inset-0 bg-[#09090B]">
-             <div className="absolute top-[-20%] right-[-10%] w-[800px] h-[800px] bg-emerald-900/30 rounded-full blur-[100px] animate-pulse"></div>
-             <div className="absolute bottom-[-20%] left-[-10%] w-[800px] h-[800px] bg-blue-900/20 rounded-full blur-[100px] animate-pulse [animation-delay:2s]"></div>
-             <div className="absolute top-[40%] left-[30%] w-[400px] h-[400px] bg-teal-900/20 rounded-full blur-[80px] animate-pulse [animation-delay:4s]"></div>
+      {/* RIGHT SIDE - Antigravity Physics Playground */}
+      <div 
+        ref={containerRef}
+        className="hidden lg:block w-[55%] bg-[#09090B] relative overflow-hidden"
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+      >
+        {/* Animated Background Orbs */}
+        <div className="absolute inset-0">
+          <div className="absolute top-[-20%] right-[-10%] w-[600px] h-[600px] bg-emerald-900/40 rounded-full blur-[120px] animate-pulse"></div>
+          <div className="absolute bottom-[-20%] left-[-10%] w-[600px] h-[600px] bg-teal-900/30 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '1s' }}></div>
+          <div className="absolute top-[30%] left-[40%] w-[400px] h-[400px] bg-cyan-900/20 rounded-full blur-[100px] animate-pulse" style={{ animationDelay: '2s' }}></div>
         </div>
-        
-        {/* Noise overlay */}
-        <div className="absolute inset-0 bg-noise opacity-[0.03] pointer-events-none"></div>
 
-        {/* Floating K3 Elements - Antigravity Effect */}
-        {floatingElements.map((el) => (
+        {/* Grid Pattern Overlay */}
+        <div className="absolute inset-0 opacity-[0.03]" style={{
+          backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
+          backgroundSize: '50px 50px'
+        }}></div>
+
+        {/* Center Text */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="text-center">
+            <p className="text-white/10 text-6xl font-bold tracking-widest">K3</p>
+            <p className="text-white/5 text-sm mt-2 tracking-[0.3em]">DRAG & THROW</p>
+          </div>
+        </div>
+
+        {/* Physics Elements */}
+        {elements.map((el) => (
           <div
             key={el.id}
-            className="floating-element absolute bg-white/10 backdrop-blur-md border border-white/20 px-4 py-3 rounded-2xl flex items-center gap-2 text-emerald-400 hover:bg-white/20 hover:scale-110 transition-all cursor-default"
+            className={`physics-element absolute bg-white/10 backdrop-blur-md border border-white/20 px-4 py-2.5 rounded-xl flex items-center gap-2 ${el.isDragging ? 'dragging' : ''}`}
             style={{
-              left: `${el.x}%`,
-              top: `${el.y}%`,
-              '--start-rotation': `${el.rotation}deg`,
-              '--duration': `${el.duration}s`,
-              '--delay': `${el.delay}s`,
-              transform: `scale(${el.scale})`,
-            } as React.CSSProperties}
+              left: el.x,
+              top: el.y,
+              transform: `rotate(${el.rotation}deg)`,
+              zIndex: el.isDragging ? 100 : 10,
+            }}
+            onMouseDown={(e) => handleMouseDown(e, el.id)}
           >
-            {el.icon}
-            <span className="text-sm font-semibold text-white">{el.label}</span>
+            <span className="text-emerald-400">{ICONS[el.icon]}</span>
+            <span className="text-sm font-semibold text-white whitespace-nowrap">{el.label}</span>
           </div>
         ))}
 
-        {/* Central Quote Card - Floating */}
-        <div className="max-w-lg relative z-10 w-full drift-slow">
-            {/* Glassmorphism Card */}
-            <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-10 rounded-[2.5rem] shadow-2xl relative overflow-hidden group hover:border-white/20 transition-all duration-500">
-                <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                <Quote className="absolute top-8 left-8 w-10 h-10 text-emerald-500/40" />
-                <p className="text-2xl leading-relaxed font-display font-medium text-zinc-100 mb-8 pt-6 relative z-10">
-                    "Si Asef telah mengubah cara tim kami bekerja. Pembuatan dokumen JSA yang biasanya butuh 2 jam, kini selesai dalam <span className="text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded">5 menit</span>."
-                </p>
-                <div className="flex items-center gap-4 border-t border-white/10 pt-6">
-                    <div className="w-14 h-14 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-2xl flex items-center justify-center font-bold text-xl text-white shadow-lg shadow-emerald-500/20">
-                        DK
-                    </div>
-                    <div>
-                        <p className="font-bold text-lg text-white">Dimas Kurniawan</p>
-                        <p className="text-sm text-emerald-300 font-medium">HSE Manager, PT Waskita Karya</p>
-                    </div>
-                </div>
-            </div>
-
-            {/* Floating Badges */}
-            <div className="mt-12 grid grid-cols-2 gap-4">
-                 <div className="drift-medium bg-white/5 backdrop-blur-md border border-white/5 p-4 rounded-2xl flex items-center gap-3 hover:bg-white/10 transition-colors cursor-default">
-                    <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400">
-                        <CheckCircle2 className="w-5 h-5" />
-                    </div>
-                    <div>
-                        <p className="font-bold text-white text-sm">Update 2024</p>
-                        <p className="text-xs text-zinc-400">Database Regulasi</p>
-                    </div>
-                </div>
-                 <div className="drift-slow bg-white/5 backdrop-blur-md border border-white/5 p-4 rounded-2xl flex items-center gap-3 hover:bg-white/10 transition-colors cursor-default" style={{ animationDelay: '-3s' }}>
-                    <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400">
-                        <CheckCircle2 className="w-5 h-5" />
-                    </div>
-                    <div>
-                        <p className="font-bold text-white text-sm">Export PDF</p>
-                        <p className="text-xs text-zinc-400">Laporan Instan</p>
-                    </div>
-                </div>
-            </div>
+        {/* Instructions */}
+        <div className="absolute bottom-6 left-0 right-0 text-center">
+          <p className="text-white/30 text-xs tracking-wider">Tarik dan lempar elemen K3</p>
         </div>
       </div>
     </div>
