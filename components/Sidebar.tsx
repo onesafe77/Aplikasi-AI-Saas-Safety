@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, MessageSquare, Settings, ShieldCheck, X, Trash2 } from 'lucide-react';
 import { ChatSession, User } from '../types';
+import logoImage from '@assets/si_asef_logo.png';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -64,10 +65,10 @@ const Sidebar: React.FC<SidebarProps> = ({
            
            {/* Header Logo Area */}
            <div className="flex items-center gap-3 mb-6 px-1">
-              <div className="w-8 h-8 bg-zinc-900 text-white rounded-lg flex items-center justify-center shadow-md">
-                <ShieldCheck className="w-4 h-4" />
+              <div className="w-8 h-8 rounded-lg overflow-hidden shadow-md">
+                <img src={logoImage} alt="Si Asef" className="w-full h-full object-cover" />
               </div>
-              <span className="font-display font-bold text-lg text-zinc-900 tracking-tight">Si Asef</span>
+              <span className="font-display font-bold text-lg text-zinc-900 tracking-tight">SiAsef</span>
            </div>
 
            {/* New Chat Button */}

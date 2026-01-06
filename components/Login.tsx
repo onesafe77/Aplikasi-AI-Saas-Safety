@@ -220,11 +220,13 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         
         {/* Logo */}
         <div className="flex justify-center mb-6">
-          <img 
-            src={logoImage} 
-            alt="Si Asef Logo" 
-            className="w-24 h-24 object-contain"
-          />
+          <div className="w-20 h-20 rounded-full overflow-hidden bg-white shadow-lg border-2 border-zinc-100">
+            <img 
+              src={logoImage} 
+              alt="Si Asef Logo" 
+              className="w-full h-full object-cover scale-110"
+            />
+          </div>
         </div>
 
         {/* Heading */}
