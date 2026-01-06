@@ -48,7 +48,16 @@ The application uses a secure backend proxy pattern:
 - API key is never exposed to the client
 - Vite dev server proxies `/api` requests to the backend
 
-## Recent Changes (January 5, 2026)
+## Recent Changes (January 6, 2026)
+1. **User Management System**: Admin sekarang bisa mengelola user sistem
+   - Tabel user dengan kolom: NIK, Nama, Departemen, Jabatan, Role
+   - Tambah, edit, hapus user individual
+   - Import user dari file Excel (format: NAMA, NIK, DEPARTEMEN, JABATAN)
+   - Reset password user ke default (123456)
+   - Login menggunakan autentikasi database
+   - Default admin account: NIK=admin, Password=123456
+
+## Previous Changes (January 5, 2026)
 1. **Dynamic Folder Management**: Admin sekarang bisa menambah, edit, dan hapus folder secara dinamis
    - Folder disimpan di database PostgreSQL (tabel `folders`)
    - Default 4 folder otomatis dibuat saat pertama kali: Permenaker, PP, UU, Umum
