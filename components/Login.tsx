@@ -1,9 +1,21 @@
-import React, { useState } from 'react';
-import { ShieldCheck, Lock, Eye, EyeOff, ArrowRight, Loader2, Quote, ShieldAlert, IdCard, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ShieldCheck, Lock, Eye, EyeOff, ArrowRight, Loader2, Quote, ShieldAlert, IdCard, CheckCircle2, FileText, Shield, AlertTriangle, HardHat, Flame, Zap } from 'lucide-react';
 import { User as UserType } from '../types';
 
 interface LoginProps {
   onLoginSuccess: (user: UserType) => void;
+}
+
+interface FloatingElement {
+  id: number;
+  icon: React.ReactNode;
+  label: string;
+  x: number;
+  y: number;
+  rotation: number;
+  scale: number;
+  duration: number;
+  delay: number;
 }
 
 const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
@@ -12,6 +24,34 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const [nik, setNik] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [floatingElements, setFloatingElements] = useState<FloatingElement[]>([]);
+
+  useEffect(() => {
+    const icons = [
+      { icon: <Shield className="w-6 h-6" />, label: 'K3' },
+      { icon: <HardHat className="w-6 h-6" />, label: 'APD' },
+      { icon: <FileText className="w-6 h-6" />, label: 'SOP' },
+      { icon: <AlertTriangle className="w-6 h-6" />, label: 'Bahaya' },
+      { icon: <Flame className="w-6 h-6" />, label: 'APAR' },
+      { icon: <Zap className="w-6 h-6" />, label: 'Listrik' },
+      { icon: <CheckCircle2 className="w-6 h-6" />, label: 'Audit' },
+      { icon: <ShieldCheck className="w-6 h-6" />, label: 'Safety' },
+    ];
+
+    const elements: FloatingElement[] = icons.map((item, i) => ({
+      id: i,
+      icon: item.icon,
+      label: item.label,
+      x: Math.random() * 80 + 10,
+      y: Math.random() * 80 + 10,
+      rotation: Math.random() * 360,
+      scale: 0.8 + Math.random() * 0.4,
+      duration: 15 + Math.random() * 10,
+      delay: Math.random() * -20,
+    }));
+
+    setFloatingElements(elements);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,6 +94,63 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
   return (
     <div className="min-h-screen w-full bg-white flex overflow-hidden font-sans">
+      <style>{`
+        @keyframes float {
+          0%, 100% {
+            transform: translate(0, 0) rotate(var(--start-rotation));
+          }
+          25% {
+            transform: translate(calc(var(--move-x) * 1px), calc(var(--move-y) * -1px)) rotate(calc(var(--start-rotation) + 90deg));
+          }
+          50% {
+            transform: translate(calc(var(--move-x) * -0.5px), calc(var(--move-y) * 1.5px)) rotate(calc(var(--start-rotation) + 180deg));
+          }
+          75% {
+            transform: translate(calc(var(--move-x) * -1px), calc(var(--move-y) * -0.5px)) rotate(calc(var(--start-rotation) + 270deg));
+          }
+        }
+        
+        @keyframes drift {
+          0%, 100% {
+            transform: translateY(0) rotate(0deg);
+          }
+          33% {
+            transform: translateY(-30px) rotate(5deg);
+          }
+          66% {
+            transform: translateY(20px) rotate(-3deg);
+          }
+        }
+        
+        @keyframes pulse-glow {
+          0%, 100% {
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+          }
+          50% {
+            box-shadow: 0 0 40px rgba(16, 185, 129, 0.6);
+          }
+        }
+        
+        .floating-element {
+          animation: float var(--duration) ease-in-out infinite;
+          animation-delay: var(--delay);
+          --move-x: 50;
+          --move-y: 30;
+        }
+        
+        .drift-slow {
+          animation: drift 8s ease-in-out infinite;
+        }
+        
+        .drift-medium {
+          animation: drift 6s ease-in-out infinite;
+          animation-delay: -2s;
+        }
+        
+        .pulse-glow {
+          animation: pulse-glow 3s ease-in-out infinite;
+        }
+      `}</style>
       
       {/* LEFT SIDE - Form Section */}
       <div className="w-full lg:w-[45%] flex flex-col justify-center px-8 sm:px-12 lg:px-16 xl:px-24 py-12 relative z-10 bg-white">
@@ -61,7 +158,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
             
             {/* Header / Logo */}
             <div className="flex items-center gap-3 mb-8">
-              <div className="w-10 h-10 bg-zinc-900 text-white rounded-xl flex items-center justify-center shadow-lg">
+              <div className="w-10 h-10 bg-zinc-900 text-white rounded-xl flex items-center justify-center shadow-lg pulse-glow">
                 <ShieldCheck className="w-5 h-5" strokeWidth={2.5} />
               </div>
               <span className="font-display text-xl font-bold text-zinc-900">Si Asef</span>
@@ -163,18 +260,39 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         </div>
       </div>
 
-      {/* RIGHT SIDE - Feature Showcase */}
+      {/* RIGHT SIDE - Antigravity Floating Elements */}
       <div className="hidden lg:flex w-[55%] bg-[#09090B] text-white relative items-center justify-center p-16 overflow-hidden">
         {/* Animated Mesh Gradient Background */}
         <div className="absolute inset-0 bg-[#09090B]">
              <div className="absolute top-[-20%] right-[-10%] w-[800px] h-[800px] bg-emerald-900/30 rounded-full blur-[100px] animate-pulse"></div>
              <div className="absolute bottom-[-20%] left-[-10%] w-[800px] h-[800px] bg-blue-900/20 rounded-full blur-[100px] animate-pulse [animation-delay:2s]"></div>
+             <div className="absolute top-[40%] left-[30%] w-[400px] h-[400px] bg-teal-900/20 rounded-full blur-[80px] animate-pulse [animation-delay:4s]"></div>
         </div>
         
         {/* Noise overlay */}
         <div className="absolute inset-0 bg-noise opacity-[0.03] pointer-events-none"></div>
 
-        <div className="max-w-lg relative z-10 w-full animate-fade-in-up">
+        {/* Floating K3 Elements - Antigravity Effect */}
+        {floatingElements.map((el) => (
+          <div
+            key={el.id}
+            className="floating-element absolute bg-white/10 backdrop-blur-md border border-white/20 px-4 py-3 rounded-2xl flex items-center gap-2 text-emerald-400 hover:bg-white/20 hover:scale-110 transition-all cursor-default"
+            style={{
+              left: `${el.x}%`,
+              top: `${el.y}%`,
+              '--start-rotation': `${el.rotation}deg`,
+              '--duration': `${el.duration}s`,
+              '--delay': `${el.delay}s`,
+              transform: `scale(${el.scale})`,
+            } as React.CSSProperties}
+          >
+            {el.icon}
+            <span className="text-sm font-semibold text-white">{el.label}</span>
+          </div>
+        ))}
+
+        {/* Central Quote Card - Floating */}
+        <div className="max-w-lg relative z-10 w-full drift-slow">
             {/* Glassmorphism Card */}
             <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-10 rounded-[2.5rem] shadow-2xl relative overflow-hidden group hover:border-white/20 transition-all duration-500">
                 <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
@@ -195,7 +313,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
             {/* Floating Badges */}
             <div className="mt-12 grid grid-cols-2 gap-4">
-                 <div className="bg-white/5 backdrop-blur-md border border-white/5 p-4 rounded-2xl flex items-center gap-3 hover:bg-white/10 transition-colors cursor-default">
+                 <div className="drift-medium bg-white/5 backdrop-blur-md border border-white/5 p-4 rounded-2xl flex items-center gap-3 hover:bg-white/10 transition-colors cursor-default">
                     <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400">
                         <CheckCircle2 className="w-5 h-5" />
                     </div>
@@ -204,7 +322,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                         <p className="text-xs text-zinc-400">Database Regulasi</p>
                     </div>
                 </div>
-                 <div className="bg-white/5 backdrop-blur-md border border-white/5 p-4 rounded-2xl flex items-center gap-3 hover:bg-white/10 transition-colors cursor-default">
+                 <div className="drift-slow bg-white/5 backdrop-blur-md border border-white/5 p-4 rounded-2xl flex items-center gap-3 hover:bg-white/10 transition-colors cursor-default" style={{ animationDelay: '-3s' }}>
                     <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400">
                         <CheckCircle2 className="w-5 h-5" />
                     </div>
