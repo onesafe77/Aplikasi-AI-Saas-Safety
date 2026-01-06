@@ -232,7 +232,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         {/* Heading */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-zinc-900 mb-2">Selamat Datang</h1>
-          <p className="text-zinc-500 text-sm">Masuk ke Si Asef - Asisten K3 Anda</p>
+          <p className="text-zinc-500 text-sm">Asisten K3 PT. KMB</p>
         </div>
 
         {/* Error Message */}
