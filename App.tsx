@@ -514,11 +514,14 @@ function App() {
                 
                 {/* Greeting */}
                 <div className="mb-8">
-                <h1 className="text-3xl font-serif font-bold text-zinc-900 mb-2">
+                <h1 className="text-3xl font-serif font-bold text-zinc-900 mb-1">
                     Halo, {currentUser?.name || 'Bagus K3'}.
                 </h1>
+                {currentUser?.jabatan && (
+                    <p className="text-sm text-emerald-600 font-medium mb-2">{currentUser.jabatan}</p>
+                )}
                 <p className="text-zinc-500">
-                    Saya siap membantu Anda menelusuri <strong className="text-zinc-800">Regulasi K3 & Hukum Lingkungan Indonesia</strong>.
+                    Saya siap membantu Anda menelusuri <strong className="text-zinc-800">Regulasi PT. KMB Site PT. Borneo Indobara</strong>.
                 </p>
                 </div>
 

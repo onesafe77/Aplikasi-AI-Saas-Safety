@@ -33,6 +33,8 @@ export interface User {
   email: string;
   plan: 'free' | 'pro';
   role?: 'user' | 'admin';
+  jabatan?: string;
+  departemen?: string;
 }
 
 export interface Employee {

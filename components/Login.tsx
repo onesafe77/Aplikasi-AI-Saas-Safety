@@ -83,7 +83,9 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         name: data.user.nama,
         email: `${data.user.nik}@perusahaan.id`,
         plan: data.user.role === 'admin' ? 'pro' : 'free',
-        role: data.user.role
+        role: data.user.role,
+        jabatan: data.user.jabatan,
+        departemen: data.user.departemen
       });
     } catch (error: any) {
       setError('Terjadi kesalahan. Silakan coba lagi.');
