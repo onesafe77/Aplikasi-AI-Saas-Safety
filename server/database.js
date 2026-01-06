@@ -93,6 +93,28 @@ export async function initDatabase() {
       `);
     }
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        nik VARCHAR(50) UNIQUE NOT NULL,
+        nama VARCHAR(255) NOT NULL,
+        departemen VARCHAR(100),
+        jabatan VARCHAR(100),
+        password VARCHAR(255) DEFAULT '123456',
+        role VARCHAR(20) DEFAULT 'user',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    const adminCount = await client.query(`SELECT COUNT(*) FROM users WHERE role = 'admin'`);
+    if (parseInt(adminCount.rows[0].count) === 0) {
+      await client.query(`
+        INSERT INTO users (nik, nama, departemen, jabatan, role) VALUES 
+        ('admin', 'Administrator', 'IT', 'System Admin', 'admin')
+        ON CONFLICT (nik) DO NOTHING
+      `);
+    }
+
     console.log('Database tables initialized');
   } finally {
     client.release();
@@ -255,6 +277,70 @@ export async function deleteFolder(id) {
 
 export async function updateDocumentsFolder(oldFolderName, newFolderName) {
   await pool.query(`UPDATE documents SET folder = $1 WHERE folder = $2`, [newFolderName, oldFolderName]);
+}
+
+export async function getAllUsers() {
+  const result = await pool.query(
+    `SELECT id, nik, nama, departemen, jabatan, role, created_at FROM users ORDER BY nama`
+  );
+  return result.rows;
+}
+
+export async function createUser(nik, nama, departemen, jabatan, role = 'user') {
+  const result = await pool.query(
+    `INSERT INTO users (nik, nama, departemen, jabatan, role) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [nik, nama, departemen, jabatan, role]
+  );
+  return result.rows[0];
+}
+
+export async function updateUser(id, nik, nama, departemen, jabatan, role) {
+  const result = await pool.query(
+    `UPDATE users SET nik = $1, nama = $2, departemen = $3, jabatan = $4, role = $5 WHERE id = $6 RETURNING *`,
+    [nik, nama, departemen, jabatan, role, id]
+  );
+  return result.rows[0];
+}
+
+export async function deleteUser(id) {
+  await pool.query(`DELETE FROM users WHERE id = $1`, [id]);
+}
+
+export async function resetUserPassword(id, newPassword = '123456') {
+  await pool.query(`UPDATE users SET password = $1 WHERE id = $2`, [newPassword, id]);
+}
+
+export async function getUserByNik(nik) {
+  const result = await pool.query(
+    `SELECT id, nik, nama, departemen, jabatan, password, role FROM users WHERE nik = $1`,
+    [nik]
+  );
+  return result.rows[0] || null;
+}
+
+export async function bulkCreateUsers(users) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const results = [];
+    for (const user of users) {
+      const result = await client.query(
+        `INSERT INTO users (nik, nama, departemen, jabatan, role) 
+         VALUES ($1, $2, $3, $4, $5) 
+         ON CONFLICT (nik) DO UPDATE SET nama = $2, departemen = $3, jabatan = $4
+         RETURNING *`,
+        [user.nik, user.nama, user.departemen, user.jabatan, user.role || 'user']
+      );
+      results.push(result.rows[0]);
+    }
+    await client.query('COMMIT');
+    return results;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export { pool };

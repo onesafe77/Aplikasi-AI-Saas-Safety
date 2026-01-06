@@ -1,22 +1,26 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { UploadCloud, FileText, Trash2, Search, CheckCircle2, Database, AlertCircle, LogOut, Loader2, FolderOpen, ChevronDown, ChevronRight, FileType, HardDrive, Plus, Pencil, X } from 'lucide-react';
-import { UploadedDocument, Folder } from '../types';
+import { UploadCloud, FileText, Trash2, Search, CheckCircle2, Database, AlertCircle, LogOut, Loader2, FolderOpen, ChevronDown, ChevronRight, FileType, HardDrive, Plus, Pencil, X, Users } from 'lucide-react';
+import { UploadedDocument, Folder, Employee } from '../types';
+import UserManagement from './UserManagement';
 
 interface AdminDashboardProps {
   documents: UploadedDocument[];
   folders: Folder[];
+  users: Employee[];
   onUpload: (file: File, folder: string, onProgress?: (percent: number) => void) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onLogout: () => void;
   onFolderCreate: (name: string) => Promise<void>;
   onFolderUpdate: (id: number, name: string, oldName: string) => Promise<void>;
   onFolderDelete: (id: number) => Promise<void>;
+  onRefreshUsers: () => void;
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
-  documents, folders, onUpload, onDelete, onLogout, 
-  onFolderCreate, onFolderUpdate, onFolderDelete 
+  documents, folders, users, onUpload, onDelete, onLogout, 
+  onFolderCreate, onFolderUpdate, onFolderDelete, onRefreshUsers 
 }) => {
+  const [activeTab, setActiveTab] = useState<'documents' | 'users'>('documents');
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -215,7 +219,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       <div className="max-w-5xl mx-auto">
         
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-4">
                 <button onClick={onLogout} className="p-2 hover:bg-zinc-200 rounded-full transition-colors flex items-center gap-2 group" title="Logout">
                     <LogOut className="w-5 h-5 text-zinc-600 group-hover:text-red-600" />
@@ -223,7 +227,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </button>
                 <div>
                     <h1 className="text-2xl font-display font-bold text-zinc-900">Knowledge Base Admin</h1>
-                    <p className="text-zinc-500 text-sm">Kelola dokumen regulasi internal perusahaan untuk Si Asef.</p>
+                    <p className="text-zinc-500 text-sm">Kelola dokumen regulasi dan user untuk Si Asef.</p>
                 </div>
             </div>
             <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-xl border border-zinc-200 shadow-sm">
@@ -235,6 +239,36 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
         </div>
 
+        {/* Tabs */}
+        <div className="flex gap-1 mb-6 bg-zinc-100 p-1 rounded-xl w-fit">
+          <button
+            onClick={() => setActiveTab('documents')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+              activeTab === 'documents'
+                ? 'bg-white text-emerald-600 shadow-sm'
+                : 'text-zinc-600 hover:text-zinc-900'
+            }`}
+          >
+            <FileText className="w-4 h-4" />
+            Dokumen
+          </button>
+          <button
+            onClick={() => setActiveTab('users')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+              activeTab === 'users'
+                ? 'bg-white text-emerald-600 shadow-sm'
+                : 'text-zinc-600 hover:text-zinc-900'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            User
+          </button>
+        </div>
+
+        {activeTab === 'users' ? (
+          <UserManagement users={users} onRefresh={onRefreshUsers} />
+        ) : (
+        <>
         {/* Folder Selection */}
         <div className="mb-6">
             <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2 block">Pilih Folder Tujuan</label>
@@ -542,6 +576,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
             </div>
         </div>
+        </>
+        )}
 
       </div>
     </div>

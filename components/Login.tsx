@@ -13,7 +13,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     
@@ -24,29 +24,32 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
     setIsLoading(true);
 
-    setTimeout(() => {
-      setIsLoading(false);
-      
-      // Admin Check
-      if (nik === 'admin' && password === '123') {
-          onLoginSuccess({
-              name: 'Administrator',
-              email: 'admin@siasef.id',
-              plan: 'pro',
-              role: 'admin'
-          });
-          return;
-      } 
-      
-      // Standard User Login
-      onLoginSuccess({
-        name: `Karyawan ${nik}`,
-        email: `${nik}@perusahaan.id`,
-        plan: 'free',
-        role: 'user'
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nik, password })
       });
       
-    }, 1500);
+      const data = await res.json();
+      
+      if (!res.ok) {
+        setError(data.error || 'Login gagal');
+        setIsLoading(false);
+        return;
+      }
+      
+      onLoginSuccess({
+        name: data.user.nama,
+        email: `${data.user.nik}@perusahaan.id`,
+        plan: data.user.role === 'admin' ? 'pro' : 'free',
+        role: data.user.role
+      });
+    } catch (error: any) {
+      setError('Terjadi kesalahan. Silakan coba lagi.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

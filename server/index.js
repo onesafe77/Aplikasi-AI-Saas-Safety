@@ -49,6 +49,7 @@ async function parsePdfRobust(buffer) {
     }
   }
 }
+import XLSX from 'xlsx';
 import { 
   initDatabase, 
   insertDocument, 
@@ -69,7 +70,14 @@ import {
   createFolder,
   updateFolder,
   deleteFolder,
-  updateDocumentsFolder
+  updateDocumentsFolder,
+  getAllUsers,
+  createUser,
+  updateUser,
+  deleteUser,
+  resetUserPassword,
+  getUserByNik,
+  bulkCreateUsers
 } from './database.js';
 import { 
   chunkText, 
@@ -323,6 +331,157 @@ app.delete('/api/folders/:id', async (req, res) => {
   } catch (error) {
     console.error('Delete folder error:', error);
     res.status(500).json({ error: 'Failed to delete folder' });
+  }
+});
+
+app.get('/api/users', async (req, res) => {
+  try {
+    const users = await getAllUsers();
+    res.json(users);
+  } catch (error) {
+    console.error('Get users error:', error);
+    res.status(500).json({ error: 'Failed to get users' });
+  }
+});
+
+app.post('/api/users', async (req, res) => {
+  try {
+    const { nik, nama, departemen, jabatan, role } = req.body;
+    if (!nik || !nama) {
+      return res.status(400).json({ error: 'NIK dan Nama harus diisi' });
+    }
+    const user = await createUser(nik, nama, departemen, jabatan, role);
+    res.json(user);
+  } catch (error) {
+    console.error('Create user error:', error);
+    if (error.code === '23505') {
+      return res.status(400).json({ error: 'NIK sudah terdaftar' });
+    }
+    res.status(500).json({ error: 'Failed to create user' });
+  }
+});
+
+app.put('/api/users/:id', async (req, res) => {
+  try {
+    const { nik, nama, departemen, jabatan, role } = req.body;
+    if (!nik || !nama) {
+      return res.status(400).json({ error: 'NIK dan Nama harus diisi' });
+    }
+    const user = await updateUser(req.params.id, nik, nama, departemen, jabatan, role);
+    res.json(user);
+  } catch (error) {
+    console.error('Update user error:', error);
+    if (error.code === '23505') {
+      return res.status(400).json({ error: 'NIK sudah terdaftar' });
+    }
+    res.status(500).json({ error: 'Failed to update user' });
+  }
+});
+
+app.delete('/api/users/:id', async (req, res) => {
+  try {
+    await deleteUser(req.params.id);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete user error:', error);
+    res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
+
+app.post('/api/users/:id/reset-password', async (req, res) => {
+  try {
+    const { newPassword } = req.body;
+    await resetUserPassword(req.params.id, newPassword || '123456');
+    res.json({ success: true, message: 'Password berhasil direset' });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ error: 'Failed to reset password' });
+  }
+});
+
+app.post('/api/users/upload-excel', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+    if (data.length < 2) {
+      return res.status(400).json({ error: 'File Excel kosong atau tidak memiliki data' });
+    }
+
+    const headers = data[0].map(h => h?.toString().toLowerCase().trim() || '');
+    const namaIdx = headers.findIndex(h => h.includes('nama'));
+    const nikIdx = headers.findIndex(h => h.includes('nik'));
+    const deptIdx = headers.findIndex(h => h.includes('departemen') || h.includes('dept'));
+    const jabatanIdx = headers.findIndex(h => h.includes('jabatan') || h.includes('position'));
+
+    if (nikIdx === -1 || namaIdx === -1) {
+      return res.status(400).json({ error: 'Kolom NIK dan NAMA harus ada di file Excel' });
+    }
+
+    const users = [];
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      if (!row || !row[nikIdx] || !row[namaIdx]) continue;
+      
+      users.push({
+        nik: row[nikIdx]?.toString().trim(),
+        nama: row[namaIdx]?.toString().trim(),
+        departemen: deptIdx !== -1 ? row[deptIdx]?.toString().trim() || '' : '',
+        jabatan: jabatanIdx !== -1 ? row[jabatanIdx]?.toString().trim() || '' : '',
+        role: 'user'
+      });
+    }
+
+    if (users.length === 0) {
+      return res.status(400).json({ error: 'Tidak ada data user valid di file Excel' });
+    }
+
+    const result = await bulkCreateUsers(users);
+    res.json({ 
+      success: true, 
+      imported: result.length,
+      message: `${result.length} user berhasil diimport`
+    });
+
+  } catch (error) {
+    console.error('Upload Excel error:', error);
+    res.status(500).json({ error: 'Gagal memproses file Excel' });
+  }
+});
+
+app.post('/api/login', async (req, res) => {
+  try {
+    const { nik, password } = req.body;
+    const user = await getUserByNik(nik);
+    
+    if (!user) {
+      return res.status(401).json({ error: 'NIK tidak terdaftar' });
+    }
+    
+    if (user.password !== password) {
+      return res.status(401).json({ error: 'Password salah' });
+    }
+    
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        nik: user.nik,
+        nama: user.nama,
+        departemen: user.departemen,
+        jabatan: user.jabatan,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Login gagal' });
   }
 });
 

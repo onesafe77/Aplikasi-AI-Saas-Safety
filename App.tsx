@@ -8,7 +8,7 @@ import Login from './components/Login';
 import AdminDashboard from './components/AdminDashboard';
 import SourcePanel from './components/SourcePanel';
 import { UpgradeModal, SettingsModal } from './components/Modals';
-import { Message, Role, ChatSession, LoadingState, User, UploadedDocument, ViewState, Source, Folder } from './types';
+import { Message, Role, ChatSession, LoadingState, User, UploadedDocument, ViewState, Source, Folder, Employee } from './types';
 import { sendMessageToGemini, initializeChat, updateChatContext, uploadDocument, getDocuments, deleteDocumentApi } from './services/gemini';
 import { SourceInfo } from './components/CitationBubble';
 
@@ -17,6 +17,7 @@ function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [documents, setDocuments] = useState<UploadedDocument[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
+  const [users, setUsers] = useState<Employee[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [loadingState, setLoadingState] = useState<LoadingState>('idle');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -115,6 +116,20 @@ function App() {
       console.error('Failed to load folders:', error);
     }
   };
+
+  const loadUsers = async () => {
+    try {
+      const res = await fetch('/api/users');
+      const data = await res.json();
+      setUsers(data);
+    } catch (error) {
+      console.error('Failed to load users:', error);
+    }
+  };
+
+  useEffect(() => {
+    loadUsers();
+  }, []);
 
   const handleFolderCreate = async (name: string) => {
     const res = await fetch('/api/folders', {
@@ -400,12 +415,14 @@ function App() {
           <AdminDashboard 
             documents={documents}
             folders={folders}
+            users={users}
             onUpload={handleDocumentUpload}
             onDelete={handleDeleteDocument}
             onLogout={handleLogout}
             onFolderCreate={handleFolderCreate}
             onFolderUpdate={handleFolderUpdate}
             onFolderDelete={handleFolderDelete}
+            onRefreshUsers={loadUsers}
           />
       );
   }

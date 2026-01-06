@@ -32,7 +32,17 @@ export interface User {
   name: string;
   email: string;
   plan: 'free' | 'pro';
-  role?: 'user' | 'admin'; // Added role
+  role?: 'user' | 'admin';
+}
+
+export interface Employee {
+  id: number;
+  nik: string;
+  nama: string;
+  departemen: string;
+  jabatan: string;
+  role: 'admin' | 'user';
+  created_at?: string;
 }
 
 export interface UploadedDocument {
