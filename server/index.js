@@ -8,6 +8,7 @@ import mammoth from 'mammoth';
 import pdfParse from '@cyber2024/pdf-parse-fixed';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { GoogleGenAI } from '@google/genai';
+import OpenAI from 'openai';
 
 async function parsePdfWithPdfjs(buffer) {
   try {
@@ -489,7 +490,7 @@ app.post('/api/chat', async (req, res) => {
   try {
     const { message, sessionId } = req.body;
     
-    if (!process.env.GEMINI_API_KEY) {
+    if (!process.env.OPENAI_API_KEY && !process.env.GEMINI_API_KEY) {
       return res.status(500).json({ error: 'API key not configured' });
     }
 
@@ -508,33 +509,62 @@ app.post('/api/chat', async (req, res) => {
       }
     }
 
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    
-    let chatSession = chatSessions.get(sessionId);
-    
-    if (!chatSession) {
-      chatSession = await ai.chats.create({
-        model: 'gemini-2.5-flash',
-        config: {
-          systemInstruction: BASE_INSTRUCTION,
-          temperature: 0.3,
-        },
-      });
-      chatSessions.set(sessionId, chatSession);
-    }
-
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
 
     res.write(`data: ${JSON.stringify({ sources })}\n\n`);
 
-    const resultStream = await chatSession.sendMessageStream({ message: augmentedPrompt });
+    if (process.env.OPENAI_API_KEY) {
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      
+      let chatHistory = chatSessions.get(sessionId) || [];
+      chatHistory.push({ role: 'user', content: augmentedPrompt });
+      
+      const stream = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: BASE_INSTRUCTION },
+          ...chatHistory
+        ],
+        stream: true,
+        temperature: 0.3,
+      });
 
-    for await (const chunk of resultStream) {
-      const text = typeof chunk.text === 'function' ? chunk.text() : chunk.text;
-      if (text) {
-        res.write(`data: ${JSON.stringify({ text })}\n\n`);
+      let fullResponse = '';
+      for await (const chunk of stream) {
+        const text = chunk.choices[0]?.delta?.content || '';
+        if (text) {
+          fullResponse += text;
+          res.write(`data: ${JSON.stringify({ text })}\n\n`);
+        }
+      }
+      
+      chatHistory.push({ role: 'assistant', content: fullResponse });
+      chatSessions.set(sessionId, chatHistory);
+    } else {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      
+      let chatSession = chatSessions.get(sessionId);
+      
+      if (!chatSession) {
+        chatSession = await ai.chats.create({
+          model: 'gemini-2.5-flash',
+          config: {
+            systemInstruction: BASE_INSTRUCTION,
+            temperature: 0.3,
+          },
+        });
+        chatSessions.set(sessionId, chatSession);
+      }
+
+      const resultStream = await chatSession.sendMessageStream({ message: augmentedPrompt });
+
+      for await (const chunk of resultStream) {
+        const text = typeof chunk.text === 'function' ? chunk.text() : chunk.text;
+        if (text) {
+          res.write(`data: ${JSON.stringify({ text })}\n\n`);
+        }
       }
     }
     
