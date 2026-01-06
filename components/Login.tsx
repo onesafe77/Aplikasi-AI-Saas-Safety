@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ShieldCheck, Lock, Eye, EyeOff, ArrowRight, Loader2, ShieldAlert, IdCard } from 'lucide-react';
 import { User as UserType } from '../types';
+import logoImage from '@assets/si_asef_logo.png';
 
 interface LoginProps {
   onLoginSuccess: (user: UserType) => void;
@@ -219,9 +220,11 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         
         {/* Logo */}
         <div className="flex justify-center mb-6">
-          <div className="w-14 h-14 bg-zinc-900 text-white rounded-2xl flex items-center justify-center shadow-lg">
-            <ShieldCheck className="w-7 h-7" strokeWidth={2} />
-          </div>
+          <img 
+            src={logoImage} 
+            alt="Si Asef Logo" 
+            className="w-24 h-24 object-contain"
+          />
         </div>
 
         {/* Heading */}
@@ -296,7 +299,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
           <button 
             type="submit"
             disabled={isLoading}
-            className="w-full py-4 bg-zinc-900 text-white font-semibold text-sm rounded-xl hover:bg-zinc-800 transition-all flex items-center justify-center gap-2 group shadow-lg shadow-zinc-900/20 mt-2"
+            className="w-full py-4 bg-emerald-600 text-white font-semibold text-sm rounded-xl hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 group shadow-lg shadow-emerald-600/30 mt-2"
           >
             {isLoading ? (
               <>
