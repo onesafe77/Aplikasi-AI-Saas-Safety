@@ -57,6 +57,16 @@ The application uses a secure backend proxy pattern:
    - Login menggunakan autentikasi database
    - Default admin account: NIK=admin, Password=123456
 
+2. **UI Improvements**:
+   - Hapus tampilan plan (STARTER PLAN, progress bar, Upgrade to Pro) dari sidebar
+   - Hapus tombol UPGRADE dari header
+   - Tambah fitur hapus chat di sidebar dengan konfirmasi
+
+3. **Login Antigravity Effect**:
+   - Elemen K3 (APD, SOP, APAR, dll) melayang-layang di sisi kanan halaman login
+   - CSS animation untuk efek drift dan float
+   - Pulse glow effect pada logo
+
 ## Previous Changes (January 5, 2026)
 1. **Dynamic Folder Management**: Admin sekarang bisa menambah, edit, dan hapus folder secara dinamis
    - Folder disimpan di database PostgreSQL (tabel `folders`)
