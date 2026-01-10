@@ -490,7 +490,10 @@ app.post('/api/chat', async (req, res) => {
   try {
     const { message, sessionId } = req.body;
     
-    if (!process.env.OPENAI_API_KEY && !process.env.GEMINI_API_KEY) {
+    const openaiApiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
+    const openaiBaseUrl = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
+    
+    if (!openaiApiKey && !process.env.GEMINI_API_KEY) {
       return res.status(500).json({ error: 'API key not configured' });
     }
 
@@ -515,8 +518,12 @@ app.post('/api/chat', async (req, res) => {
 
     res.write(`data: ${JSON.stringify({ sources })}\n\n`);
 
-    if (process.env.OPENAI_API_KEY) {
-      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    if (openaiApiKey) {
+      const openaiConfig = { apiKey: openaiApiKey };
+      if (openaiBaseUrl) {
+        openaiConfig.baseURL = openaiBaseUrl;
+      }
+      const openai = new OpenAI(openaiConfig);
       
       let chatHistory = chatSessions.get(sessionId) || [];
       chatHistory.push({ role: 'user', content: augmentedPrompt });
