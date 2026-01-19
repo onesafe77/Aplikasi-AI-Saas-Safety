@@ -490,8 +490,8 @@ app.post('/api/chat', async (req, res) => {
   try {
     const { message, sessionId } = req.body;
     
-    const openaiApiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
-    const openaiBaseUrl = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
+    const openaiApiKey = process.env.OPENAI_API_KEY || process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+    const openaiBaseUrl = process.env.OPENAI_API_KEY ? undefined : process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
     
     if (!openaiApiKey && !process.env.GEMINI_API_KEY) {
       return res.status(500).json({ error: 'API key not configured' });
