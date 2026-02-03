@@ -68,7 +68,7 @@ function App() {
   useEffect(() => {
     const loadDocuments = async () => {
       try {
-        const docs = await getDocuments();
+        const docs = await getDocuments(currentUser?.organization_id || null);
         setDocuments(docs.map((d: any) => ({
           id: d.id.toString(),
           name: d.name || d.original_name,
@@ -82,8 +82,10 @@ function App() {
         console.error('Failed to load documents:', error);
       }
     };
-    loadDocuments();
-  }, []);
+    if (currentUser) {
+      loadDocuments();
+    }
+  }, [currentUser]);
 
   // Load chat sessions from database
   const getUserNik = () => {
@@ -121,7 +123,10 @@ function App() {
 
   const loadFolders = async () => {
     try {
-      const res = await fetch('/api/folders');
+      const url = currentUser?.organization_id
+        ? `/api/folders?organizationId=${currentUser.organization_id}`
+        : '/api/folders';
+      const res = await fetch(url);
       const data = await res.json();
       setFolders(data);
     } catch (error) {
@@ -147,7 +152,7 @@ function App() {
     const res = await fetch('/api/folders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name })
+      body: JSON.stringify({ name, organizationId: currentUser?.organization_id })
     });
     if (!res.ok) {
       const err = await res.json();
@@ -181,7 +186,7 @@ function App() {
   };
 
   const refreshDocuments = async () => {
-    const docs = await getDocuments();
+    const docs = await getDocuments(currentUser?.organization_id || null);
     setDocuments(docs.map((d: any) => ({
       id: d.id.toString(),
       name: d.name || d.original_name,
@@ -289,7 +294,7 @@ function App() {
   };
 
   const handleDocumentUpload = async (file: File, folder: string = 'Umum', onProgress?: (percent: number) => void) => {
-    const result = await uploadDocument(file, folder, onProgress);
+    const result = await uploadDocument(file, folder, currentUser?.organization_id || null, onProgress);
     if (result.success) {
       const docs = await getDocuments();
       setDocuments(docs.map((d: any) => ({
@@ -472,6 +477,7 @@ function App() {
         onFolderUpdate={handleFolderUpdate}
         onFolderDelete={handleFolderDelete}
         onRefreshUsers={loadUsers}
+        onBack={() => setCurrentView('chat')}
       />
     );
   }
@@ -489,6 +495,7 @@ function App() {
         onDeleteSession={handleDeleteSession}
         onOpenSettings={() => setShowSettingsModal(true)}
         onLogout={handleLogout}
+        onOpenAdmin={() => setCurrentView('admin')}
       />
 
       {/* Modals */}
@@ -502,166 +509,97 @@ function App() {
 
       <main className="flex-1 flex flex-col h-full relative overflow-hidden transition-all duration-300 bg-[#F9FAFB]">
 
-        {/* Header - Styled like Breadcrumbs */}
-        <header className="flex-none h-14 flex items-center justify-between px-6 z-10 bg-white border-b border-zinc-100">
+        {/* Header - Minimalist */}
+        <header className="flex-none h-14 flex items-center justify-between px-4 md:px-8 z-10 bg-white/80 backdrop-blur-md sticky top-0">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="text-zinc-400 hover:text-zinc-600"
+              className="p-2 hover:bg-zinc-100 rounded-lg text-zinc-500 transition-colors"
             >
               {sidebarOpen ? <PanelLeftClose className="w-5 h-5" /> : <PanelLeftOpen className="w-5 h-5" />}
             </button>
-
-            {/* Breadcrumbs */}
-            <div className="flex items-center text-sm">
-              <span className="font-semibold text-zinc-900">Si Asef</span>
-              <span className="mx-2 text-zinc-300">/</span>
-              <span className="text-zinc-500 font-medium">Dashboard Hukum</span>
-            </div>
+            <span className="font-semibold text-zinc-700 text-sm">Model K3 3.5 Sonnet</span>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="hidden md:flex items-center gap-1 text-xs font-medium text-zinc-400 uppercase tracking-widest">
-              <span>HOME</span>
-            </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleNewChat}
+              className="p-2 hover:bg-zinc-100 rounded-lg text-zinc-500 hover:text-zinc-900 transition-colors"
+              title="New Chat"
+            >
+              <Sparkles className="w-4 h-4" />
+            </button>
           </div>
         </header>
 
         {/* Main Content Area */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto w-full relative scroll-smooth p-4 md:p-8">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto w-full relative scroll-smooth">
           {messages.length === 0 ? (
-            <div className="max-w-5xl mx-auto animate-fade-in-up">
+            <div className="h-full flex flex-col items-center justify-center p-4 md:p-8 max-w-3xl mx-auto animate-fade-in">
 
-              {/* Greeting */}
-              <div className="mb-8">
-                <h1 className="text-3xl font-serif font-bold text-zinc-900 mb-1">
-                  Halo, {currentUser?.name || 'Bagus K3'}.
+              {/* Minimalist Greeting */}
+              <div className="text-center mb-12">
+                <div className="w-16 h-16 bg-white border border-zinc-200 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-sm">
+                  <ShieldCheck className="w-8 h-8 text-emerald-600" />
+                </div>
+                <h1 className="text-2xl md:text-3xl font-serif font-medium text-zinc-900 mb-2">
+                  Selamat Datang, {currentUser?.name?.split(' ')[0] || 'User'}.
                 </h1>
-                {currentUser?.jabatan && (
-                  <p className="text-sm text-emerald-600 font-medium mb-2">{currentUser.jabatan}</p>
-                )}
                 <p className="text-zinc-500">
-                  Saya siap membantu Anda menelusuri <strong className="text-zinc-800">Regulasi PT. KMB Site PT. Borneo Indobara</strong>.
+                  Saya siap membantu Anda menelusuri regulasi K3.
                 </p>
               </div>
 
-              {/* Top Section: Spotlight & Library */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-
-                {/* Spotlight Card (Dark) - Always visible */}
-                <div className="lg:col-span-2 bg-zinc-900 rounded-[2rem] p-6 md:p-8 relative overflow-hidden text-white flex flex-col justify-between min-h-[240px] md:min-h-[280px] shadow-xl group">
-                  <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-emerald-900/40 rounded-full blur-[100px] pointer-events-none"></div>
-                  <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-blue-900/20 rounded-full blur-[80px] pointer-events-none"></div>
-
-                  <div className="relative z-10">
-                    <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 mb-6">
-                      <Sparkles className="w-3 h-3 text-amber-400" fill="currentColor" />
-                      <span className="text-xs font-bold uppercase tracking-wider text-zinc-200">Regulasi Spotlight</span>
-                    </div>
-
-                    <blockquote className="font-serif text-2xl md:text-3xl leading-snug mb-6 text-white/90">
-                      "Perusahaan wajib menerapkan SMK3 jika mempekerjakan minimal 100 orang atau memiliki potensi bahaya tinggi."
-                    </blockquote>
-
-                    <div className="inline-block bg-zinc-800 text-zinc-400 text-xs px-2 py-1 rounded mb-6 font-mono">
-                      PP 50 Tahun 2012 Pasal 5
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => handleSendMessage("Jelaskan tentang kewajiban SMK3 menurut PP 50 Tahun 2012")}
-                    className="relative z-10 self-start bg-white text-zinc-900 px-6 py-3 rounded-xl text-sm font-bold hover:bg-emerald-50 hover:text-emerald-700 transition-all flex items-center gap-2"
-                  >
-                    Pelajari SMK3
-                  </button>
-
-                  {/* Background Icon Decoration */}
-                  <Scale className="absolute right-8 bottom-8 w-32 h-32 text-white/5 rotate-12" />
-                </div>
-
-                {/* Regulation Library (List) - Hidden on mobile */}
-                <div className="hidden lg:flex bg-white rounded-[2rem] border border-zinc-200 p-6 flex-col h-full shadow-sm">
-                  <div className="flex items-center gap-2 mb-6">
-                    <BookOpen className="w-5 h-5 text-blue-600" />
-                    <h3 className="font-bold text-zinc-900">Pustaka Regulasi</h3>
-                  </div>
-
-                  <div className="space-y-4 flex-1">
-                    <div className="group cursor-pointer hover:bg-zinc-50 p-3 -mx-3 rounded-xl transition-colors">
-                      <div className="flex justify-between items-start mb-1">
-                        <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">Update Terbaru</span>
-                      </div>
-                      <h4 className="text-sm font-bold text-zinc-800 mb-1">UU Cipta Kerja (Klaster Ketenagakerjaan)</h4>
-                      <p className="text-xs text-zinc-400">Update Terbaru</p>
-                    </div>
-
-                    <div className="group cursor-pointer hover:bg-zinc-50 p-3 -mx-3 rounded-xl transition-colors">
-                      <h4 className="text-sm font-bold text-zinc-800 mb-1">Permenaker No. 5 Tahun 2018</h4>
-                      <p className="text-xs text-zinc-500">(Lingkungan Kerja)</p>
-                      <p className="text-[10px] text-zinc-400 mt-1">Referensi Utama</p>
-                    </div>
-
-                    <div className="group cursor-pointer hover:bg-zinc-50 p-3 -mx-3 rounded-xl transition-colors">
-                      <h4 className="text-sm font-bold text-zinc-800 mb-1">PP No. 50 Tahun 2012 (SMK3)</h4>
-                      <p className="text-xs text-zinc-400">Wajib Baca</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Feature Cards Row - Hidden on mobile */}
-              <div className="hidden md:flex mb-4 text-sm font-bold text-zinc-500 items-center gap-2">
-                <Search className="w-4 h-4" /> Penelusuran Hukum
-              </div>
-              <div className="hidden md:grid grid-cols-1 md:grid-cols-3 gap-4 mb-20">
+              {/* Suggestions Grid - 2x2 Minimalist */}
+              <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-4">
                 <button
-                  onClick={() => handleSendMessage("Carikan dasar hukum tentang...")}
-                  className="bg-white p-5 rounded-2xl border border-zinc-200 hover:border-blue-400 hover:shadow-lg hover:shadow-blue-500/5 transition-all text-left group"
+                  onClick={() => handleSendMessage("Jelaskan tentang kewajiban SMK3 menurut PP 50 Tahun 2012")}
+                  className="p-4 bg-white border border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50 rounded-xl text-left transition-all group"
                 >
-                  <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                    <Scale className="w-5 h-5 text-blue-600" />
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <Scale className="w-4 h-4 text-emerald-600" />
+                    <span className="font-medium text-zinc-900 text-sm">Dasar Hukum SMK3</span>
                   </div>
-                  <h3 className="font-bold text-zinc-900 mb-1">Cari Dasar Hukum</h3>
-                  <p className="text-xs text-zinc-500">Temukan pasal spesifik</p>
-                  <div className="mt-4 flex justify-end">
-                    <ArrowRight className="w-4 h-4 text-zinc-300 group-hover:text-blue-500 transition-colors" />
-                  </div>
+                  <p className="text-xs text-zinc-500 line-clamp-1">Kewajiban penerapan menurut PP 50/2012.</p>
                 </button>
 
                 <button
-                  onClick={() => handleSendMessage("Buatkan checklist kepatuhan untuk...")}
-                  className="bg-white p-5 rounded-2xl border border-zinc-200 hover:border-emerald-400 hover:shadow-lg hover:shadow-emerald-500/5 transition-all text-left group"
+                  onClick={() => handleSendMessage("Buatkan checklist inspeksi APD untuk area tambang")}
+                  className="p-4 bg-white border border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50 rounded-xl text-left transition-all group"
                 >
-                  <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                    <ShieldCheck className="w-5 h-5 text-emerald-600" />
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                    <span className="font-medium text-zinc-900 text-sm">Checklist Inspeksi</span>
                   </div>
-                  <h3 className="font-bold text-zinc-900 mb-1">Cek Kepatuhan</h3>
-                  <p className="text-xs text-zinc-500">Audit kesesuaian regulasi</p>
-                  <div className="mt-4 flex justify-end">
-                    <ArrowRight className="w-4 h-4 text-zinc-300 group-hover:text-emerald-500 transition-colors" />
-                  </div>
+                  <p className="text-xs text-zinc-500 line-clamp-1">Buat form inspeksi APD otomatis.</p>
                 </button>
 
                 <button
-                  onClick={() => handleSendMessage("Apa sanksi jika melanggar...")}
-                  className="bg-white p-5 rounded-2xl border border-zinc-200 hover:border-red-400 hover:shadow-lg hover:shadow-red-500/5 transition-all text-left group"
+                  onClick={() => handleSendMessage("Apa sanksi pidana jika melanggar UU No. 1 Tahun 1970?")}
+                  className="p-4 bg-white border border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50 rounded-xl text-left transition-all group"
                 >
-                  <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                    <Gavel className="w-5 h-5 text-red-500" />
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <Gavel className="w-4 h-4 text-emerald-600" />
+                    <span className="font-medium text-zinc-900 text-sm">Cek Sanksi Hukum</span>
                   </div>
-                  <h3 className="font-bold text-zinc-900 mb-1">Sanksi & Denda</h3>
-                  <p className="text-xs text-zinc-500">Konsekuensi hukum</p>
-                  <div className="mt-4 flex justify-end">
-                    <ArrowRight className="w-4 h-4 text-zinc-300 group-hover:text-red-500 transition-colors" />
+                  <p className="text-xs text-zinc-500 line-clamp-1">Konsekuensi pelanggaran K3.</p>
+                </button>
+
+                <button
+                  onClick={() => handleSendMessage("Analisa potensi bahaya dari deskripsi pekerjaan welding")}
+                  className="p-4 bg-white border border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50 rounded-xl text-left transition-all group"
+                >
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <Search className="w-4 h-4 text-emerald-600" />
+                    <span className="font-medium text-zinc-900 text-sm">Analisa Bahaya</span>
                   </div>
+                  <p className="text-xs text-zinc-500 line-clamp-1">Identifikasi risiko pekerjaan.</p>
                 </button>
               </div>
-
-              {/* Additional: User's Recent Activity / Suggestion (Optional - hidden for now to match image cleanly) */}
 
             </div>
           ) : (
-            <div className="flex flex-col pb-4 pt-4 min-h-0 max-w-4xl mx-auto">
+            <div className="flex flex-col pb-4 pt-8 min-h-0 max-w-3xl mx-auto px-4">
               {messages.map((msg, idx) => (
                 <ChatBubble
                   key={msg.id}

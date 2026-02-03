@@ -44,7 +44,7 @@ export const updateChatContext = async (documents: UploadedDocument[]) => {
 };
 
 export const sendMessageToGemini = async (
-  content: string, 
+  content: string,
   onChunk: (text: string) => void,
   onSources?: (sources: Source[]) => void
 ): Promise<void> => {
@@ -73,14 +73,14 @@ export const sendMessageToGemini = async (
 
   const decoder = new TextDecoder();
   let sourcesReceived = false;
-  
+
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
-    
+
     const chunk = decoder.decode(value, { stream: true });
     const lines = chunk.split('\n');
-    
+
     for (const line of lines) {
       if (line.startsWith('data: ')) {
         const data = line.slice(6);
@@ -109,17 +109,21 @@ export const sendMessageToGemini = async (
 };
 
 export const uploadDocument = async (
-  file: File, 
+  file: File,
   folder: string = 'Umum',
+  organizationId: string | null = null,
   onProgress?: (percent: number) => void
 ): Promise<{ success: boolean; documentId?: number; error?: string }> => {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('folder', folder);
+  if (organizationId) {
+    formData.append('organizationId', organizationId);
+  }
 
   return new Promise((resolve) => {
     const xhr = new XMLHttpRequest();
-    
+
     xhr.upload.addEventListener('progress', (event) => {
       if (event.lengthComputable && onProgress) {
         const percent = Math.round((event.loaded / event.total) * 100);
@@ -149,9 +153,13 @@ export const uploadDocument = async (
   });
 };
 
-export const getDocuments = async () => {
+export const getDocuments = async (organizationId: string | null = null) => {
   try {
-    const response = await fetch(`${getApiUrl()}/api/documents`);
+    let url = `${getApiUrl()}/api/documents`;
+    if (organizationId) {
+      url += `?organizationId=${organizationId}`;
+    }
+    const response = await fetch(url);
     if (!response.ok) throw new Error('Failed to fetch documents');
     return await response.json();
   } catch (error) {

@@ -13,18 +13,20 @@ interface SidebarProps {
   onDeleteSession: (id: string) => void;
   onOpenSettings: () => void;
   onLogout: () => void;
+  onOpenAdmin?: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ 
-  isOpen, 
-  toggleSidebar, 
-  sessions, 
+const Sidebar: React.FC<SidebarProps> = ({
+  isOpen,
+  toggleSidebar,
+  sessions,
   user,
-  onNewChat, 
+  onNewChat,
   onLoadSession,
   onDeleteSession,
   onOpenSettings,
-  onLogout
+  onLogout,
+  onOpenAdmin
 }) => {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
@@ -42,14 +44,14 @@ const Sidebar: React.FC<SidebarProps> = ({
     <>
       {/* Mobile Overlay */}
       {isOpen && (
-        <div 
-          className="fixed inset-0 bg-zinc-900/20 backdrop-blur-sm z-20 md:hidden" 
+        <div
+          className="fixed inset-0 bg-zinc-900/20 backdrop-blur-sm z-20 md:hidden"
           onClick={toggleSidebar}
         />
       )}
 
       {/* Sidebar Container */}
-      <aside 
+      <aside
         className={`
           fixed md:relative z-30 flex flex-col h-full bg-[#FAFAF9] border-r border-zinc-200
           transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)]
@@ -58,35 +60,35 @@ const Sidebar: React.FC<SidebarProps> = ({
         `}
       >
         <div className="p-5 flex-none w-[280px]">
-           {/* Close button for mobile */}
-           <div className="md:hidden w-full flex justify-end mb-2">
-             <button onClick={toggleSidebar} className="p-2 text-zinc-500"><X className="w-5 h-5"/></button>
-           </div>
-           
-           {/* Header Logo Area */}
-           <div className="flex items-center gap-3 mb-6 px-1">
-              <div className="w-8 h-8 rounded-lg overflow-hidden shadow-md">
-                <img src={logoImage} alt="Si Asef" className="w-full h-full object-cover" />
-              </div>
-              <span className="font-display font-bold text-lg text-zinc-900 tracking-tight">SiAsef</span>
-           </div>
+          {/* Close button for mobile */}
+          <div className="md:hidden w-full flex justify-end mb-2">
+            <button onClick={toggleSidebar} className="p-2 text-zinc-500"><X className="w-5 h-5" /></button>
+          </div>
 
-           {/* New Chat Button */}
-           <button 
+          {/* Header Logo Area */}
+          <div className="flex items-center gap-3 mb-6 px-1">
+            <div className="w-8 h-8 rounded-lg overflow-hidden shadow-md">
+              <img src={logoImage} alt="Si Asef" className="w-full h-full object-cover" />
+            </div>
+            <span className="font-display font-bold text-lg text-zinc-900 tracking-tight">SiAsef</span>
+          </div>
+
+          {/* New Chat Button */}
+          <button
             onClick={() => {
               onNewChat();
               if (window.innerWidth < 768) toggleSidebar();
             }}
             className="w-full flex items-center gap-3 px-4 py-3 bg-white border border-zinc-200 rounded-xl hover:border-emerald-500 hover:shadow-md hover:shadow-emerald-500/10 hover:text-emerald-700 transition-all duration-200 group text-sm text-zinc-600 shadow-sm font-semibold"
           >
-             <Plus className="w-4 h-4 text-emerald-500" />
-             Mulai Chat Baru
+            <Plus className="w-4 h-4 text-emerald-500" />
+            Mulai Chat Baru
           </button>
         </div>
 
         {/* Scrollable Area */}
         <div className="flex-1 overflow-y-auto px-5 space-y-6 scrollbar-thin w-[280px]">
-          
+
           {/* History Section */}
           <div>
             <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-3 px-2">Riwayat Chat</h3>
@@ -99,13 +101,13 @@ const Sidebar: React.FC<SidebarProps> = ({
                     {deleteConfirm === session.id ? (
                       <div className="flex items-center gap-2 px-3 py-2.5 bg-red-50 rounded-lg border border-red-200">
                         <span className="text-xs text-red-600 flex-1">Hapus chat ini?</span>
-                        <button 
+                        <button
                           onClick={() => confirmDelete(session.id)}
                           className="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
                         >
                           Ya
                         </button>
-                        <button 
+                        <button
                           onClick={() => setDeleteConfirm(null)}
                           className="px-2 py-1 bg-zinc-200 text-zinc-600 text-xs rounded hover:bg-zinc-300"
                         >
@@ -114,7 +116,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                       </div>
                     ) : (
                       <div className="flex items-center">
-                        <button 
+                        <button
                           onClick={() => onLoadSession(session.id)}
                           className="flex-1 flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-zinc-100 transition-colors text-left"
                         >
@@ -142,26 +144,37 @@ const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Footer */}
         <div className="p-5 bg-[#FAFAF9] space-y-3 w-[280px]">
-            <div className="border-t border-zinc-200 pt-3">
-                <div className="flex items-center justify-between group px-2 py-1">
-                    <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-500 flex items-center justify-center text-white shrink-0 shadow-sm">
-                            <span className="text-xs font-bold">{user ? user.name.charAt(0) : 'S'}</span>
-                        </div>
-                        <div className="text-left overflow-hidden w-28">
-                            <p className="text-sm font-bold text-zinc-900 truncate">
-                            {user ? user.name : 'Safety Officer'}
-                            </p>
-                            <p className="text-[10px] text-zinc-500 truncate">
-                            {user ? user.email : 'Free Account'}
-                            </p>
-                        </div>
-                    </div>
-                    <button onClick={onOpenSettings} className="text-zinc-400 hover:text-zinc-600">
-                        <Settings className="w-4 h-4" />
-                    </button>
+          {/* Admin Panel Button */}
+          {user?.role === 'admin' && (
+            <button
+              onClick={onOpenAdmin}
+              className="w-full flex items-center gap-3 px-4 py-2 bg-zinc-900 text-white rounded-xl hover:bg-zinc-800 transition-colors shadow-sm mb-2"
+            >
+              <ShieldCheck className="w-4 h-4" />
+              <span className="text-sm font-bold">Admin Panel</span>
+            </button>
+          )}
+
+          <div className="border-t border-zinc-200 pt-3">
+            <div className="flex items-center justify-between group px-2 py-1">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-500 flex items-center justify-center text-white shrink-0 shadow-sm">
+                  <span className="text-xs font-bold">{user ? user.name.charAt(0) : 'S'}</span>
                 </div>
+                <div className="text-left overflow-hidden w-28">
+                  <p className="text-sm font-bold text-zinc-900 truncate">
+                    {user ? user.name : 'Safety Officer'}
+                  </p>
+                  <p className="text-[10px] text-zinc-500 truncate">
+                    {user ? user.email : 'Free Account'}
+                  </p>
+                </div>
+              </div>
+              <button onClick={onOpenSettings} className="text-zinc-400 hover:text-zinc-600">
+                <Settings className="w-4 h-4" />
+              </button>
             </div>
+          </div>
         </div>
       </aside>
     </>

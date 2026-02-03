@@ -238,6 +238,7 @@ app.post('/api/documents/upload', upload.single('file'), async (req, res) => {
         `${(size / (1024 * 1024)).toFixed(1)} MB`;
 
     const folder = req.body.folder || 'Umum';
+    const organizationId = req.body.organizationId || null;
 
     const docId = await insertDocument(
       originalname,
@@ -245,7 +246,8 @@ app.post('/api/documents/upload', upload.single('file'), async (req, res) => {
       mimetype,
       fileSize,
       pageCount,
-      folder
+      folder,
+      organizationId
     );
 
     const chunks = chunkText(textContent, 1);
@@ -266,7 +268,8 @@ app.post('/api/documents/upload', upload.single('file'), async (req, res) => {
           chunk.pageNumber,
           chunk.startPosition,
           chunk.endPosition,
-          embeddings[idx]
+          embeddings[idx],
+          organizationId
         );
       }
     }
@@ -289,7 +292,8 @@ app.post('/api/documents/upload', upload.single('file'), async (req, res) => {
 
 app.get('/api/documents', async (req, res) => {
   try {
-    const documents = await getAllDocuments();
+    const organizationId = req.query.organizationId || null;
+    const documents = await getAllDocuments(organizationId);
     res.json(documents);
   } catch (error) {
     console.error('Get documents error:', error);
@@ -309,7 +313,8 @@ app.delete('/api/documents/:id', async (req, res) => {
 
 app.get('/api/folders', async (req, res) => {
   try {
-    const folders = await getAllFolders();
+    const organizationId = req.query.organizationId || null;
+    const folders = await getAllFolders(organizationId);
     res.json(folders);
   } catch (error) {
     console.error('Get folders error:', error);
@@ -319,11 +324,11 @@ app.get('/api/folders', async (req, res) => {
 
 app.post('/api/folders', async (req, res) => {
   try {
-    const { name, description } = req.body;
+    const { name, description, organizationId } = req.body;
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'Nama folder harus diisi' });
     }
-    const folder = await createFolder(name.trim(), description);
+    const folder = await createFolder(name.trim(), description, organizationId);
     res.json(folder);
   } catch (error) {
     console.error('Create folder error:', error);

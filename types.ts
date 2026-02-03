@@ -35,6 +35,7 @@ export interface User {
   role?: 'user' | 'admin';
   jabatan?: string;
   departemen?: string;
+  organization_id?: string;
 }
 
 export interface Employee {

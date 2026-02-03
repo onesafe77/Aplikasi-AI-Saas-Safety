@@ -214,20 +214,20 @@ export async function initDatabase() {
   }
 }
 
-export async function insertDocument(name, originalName, fileType, fileSize, totalPages, folder = 'Umum') {
-  const result = await pool.query(
-    `INSERT INTO documents (name, original_name, file_type, file_size, total_pages, folder) 
-     VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-    [name, originalName, fileType, fileSize, totalPages, folder]
+export async function insertDocument(name, originalName, fileType, fileSize, totalPages, folder = 'Umum', organizationId = null) {
+  const result = await pool.query( // Using pool directly
+    `INSERT INTO documents (name, original_name, file_type, file_size, total_pages, folder, organization_id) 
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+    [name, originalName, fileType, fileSize, totalPages, folder, organizationId]
   );
   return result.rows[0].id;
 }
 
-export async function insertChunk(documentId, chunkIndex, content, pageNumber, startPos, endPos, embedding) {
+export async function insertChunk(documentId, chunkIndex, content, pageNumber, startPos, endPos, embedding, organizationId = null) {
   await pool.query(
-    `INSERT INTO chunks (document_id, chunk_index, content, page_number, start_position, end_position, embedding) 
-     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-    [documentId, chunkIndex, content, pageNumber, startPos, endPos, embedding]
+    `INSERT INTO chunks (document_id, chunk_index, content, page_number, start_position, end_position, embedding, organization_id) 
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    [documentId, chunkIndex, content, pageNumber, startPos, endPos, embedding, organizationId]
   );
 }
 
@@ -238,11 +238,22 @@ export async function updateDocumentChunkCount(documentId, count) {
   );
 }
 
-export async function getAllDocuments() {
-  const result = await pool.query(
-    `SELECT id, name, original_name, file_type, file_size, folder, total_pages, total_chunks, created_at 
-     FROM documents ORDER BY folder, created_at DESC`
-  );
+export async function getAllDocuments(organizationId = null) {
+  let query = `SELECT id, name, original_name, file_type, file_size, folder, total_pages, total_chunks, created_at 
+     FROM documents WHERE 1=1`;
+  const params = [];
+
+  if (organizationId) {
+    query += ` AND (organization_id = $1 OR organization_id IS NULL)`; // Include public docs too if needed, or strictly $1
+    // Ideally, for SaaS isolation, strict check:
+    query = `SELECT id, name, original_name, file_type, file_size, folder, total_pages, total_chunks, created_at 
+     FROM documents WHERE organization_id = $1`;
+    params.push(organizationId);
+  }
+
+  query += ` ORDER BY folder, created_at DESC`;
+
+  const result = await pool.query(query, params);
   return result.rows;
 }
 
@@ -263,6 +274,7 @@ export async function getAllChunks() {
 }
 
 export async function getChunksByIds(ids) {
+  // ... existing code ...
   if (!ids || ids.length === 0) return [];
   const result = await pool.query(
     `SELECT c.id, c.document_id, c.chunk_index, c.content, c.page_number,
@@ -276,6 +288,7 @@ export async function getChunksByIds(ids) {
 }
 
 export async function getRandomChunk() {
+  // ... existing code ...
   const result = await pool.query(
     `SELECT c.id, c.content, c.page_number,
             d.name as document_name, d.original_name
@@ -288,15 +301,16 @@ export async function getRandomChunk() {
   return result.rows[0] || null;
 }
 
-export async function createChatSession(id, title, userId = null) {
+export async function createChatSession(id, title, userId = null, organizationId = null) {
   await pool.query(
-    `INSERT INTO chat_sessions (id, title, user_id) VALUES ($1, $2, $3)
+    `INSERT INTO chat_sessions (id, title, user_id, organization_id) VALUES ($1, $2, $3, $4)
      ON CONFLICT (id) DO UPDATE SET title = $2, updated_at = CURRENT_TIMESTAMP`,
-    [id, title, userId]
+    [id, title, userId, organizationId]
   );
 }
 
 export async function getChatSessions(userId = null) {
+  // ... existing code ...
   if (userId) {
     const result = await pool.query(
       `SELECT id, title, created_at, updated_at FROM chat_sessions 
@@ -345,18 +359,25 @@ export async function deleteChatSession(sessionId) {
   await pool.query(`DELETE FROM chat_sessions WHERE id = $1`, [sessionId]);
 }
 
-export async function getAllFolders() {
-  const result = await pool.query(
-    `SELECT id, name, description, icon, sort_order, created_at FROM folders ORDER BY sort_order, name`
-  );
+export async function getAllFolders(organizationId = null) {
+  let query = `SELECT id, name, description, icon, sort_order, created_at FROM folders WHERE 1=1`;
+  const params = [];
+
+  if (organizationId) {
+    query += ` AND (organization_id = $1 OR organization_id IS NULL)`; // Allow default folders (NULL org_id)
+    params.push(organizationId);
+  }
+
+  query += ` ORDER BY sort_order, name`;
+  const result = await pool.query(query, params);
   return result.rows;
 }
 
-export async function createFolder(name, description = null) {
+export async function createFolder(name, description = null, organizationId = null) {
   const maxOrder = await pool.query(`SELECT COALESCE(MAX(sort_order), 0) + 1 as next_order FROM folders`);
   const result = await pool.query(
-    `INSERT INTO folders (name, description, sort_order) VALUES ($1, $2, $3) RETURNING *`,
-    [name, description, maxOrder.rows[0].next_order]
+    `INSERT INTO folders (name, description, sort_order, organization_id) VALUES ($1, $2, $3, $4) RETURNING *`,
+    [name, description, maxOrder.rows[0].next_order, organizationId]
   );
   return result.rows[0];
 }
