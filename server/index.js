@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
@@ -6,26 +7,48 @@ import multer from 'multer';
 import fs from 'fs';
 import mammoth from 'mammoth';
 import pdfParse from '@cyber2024/pdf-parse-fixed';
-import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
+import pdfjsLib from 'pdfjs-dist/legacy/build/pdf.js';
 import { GoogleGenAI } from '@google/genai';
 import OpenAI from 'openai';
+
+const slugify = (text) => {
+  return text
+    .toString()
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')     // Replace spaces with -
+    .replace(/[^\w-]+/g, '')  // Remove all non-word chars
+    .replace(/--+/g, '-');    // Replace multiple - with single -
+};
+
+process.on('uncaughtException', (err) => {
+  console.error('UNCAUGHT EXCEPTION:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('UNHANDLED REJECTION at:', promise, 'reason:', reason);
+});
+
+process.on('exit', (code) => {
+  console.log(`Process exited with code: ${code}`);
+});
 
 async function parsePdfWithPdfjs(buffer) {
   try {
     const data = new Uint8Array(buffer);
     const loadingTask = pdfjsLib.getDocument({ data, useSystemFonts: true });
     const pdf = await loadingTask.promise;
-    
+
     let fullText = '';
     const pageCount = pdf.numPages;
-    
+
     for (let i = 1; i <= pageCount; i++) {
       const page = await pdf.getPage(i);
       const textContent = await page.getTextContent();
       const pageText = textContent.items.map(item => item.str).join(' ');
       fullText += pageText + '\n';
     }
-    
+
     return { text: fullText, numpages: pageCount };
   } catch (error) {
     console.error('pdfjs parsing error:', error.message);
@@ -51,12 +74,12 @@ async function parsePdfRobust(buffer) {
   }
 }
 import XLSX from 'xlsx';
-import { 
-  initDatabase, 
-  insertDocument, 
-  insertChunk, 
+import {
+  initDatabase,
+  insertDocument,
+  insertChunk,
   updateDocumentChunkCount,
-  getAllDocuments, 
+  getAllDocuments,
   deleteDocument,
   getAllChunks,
   getChunksByIds,
@@ -78,14 +101,15 @@ import {
   deleteUser,
   resetUserPassword,
   getUserByNik,
-  bulkCreateUsers
+  bulkCreateUsers,
+  createOrganization
 } from './database.js';
-import { 
-  chunkText, 
+import {
+  chunkText,
   generateEmbedding,
   generateEmbeddingsBatch,
-  searchSimilarChunks, 
-  buildRAGPrompt 
+  searchSimilarChunks,
+  buildRAGPrompt
 } from './rag.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -97,7 +121,12 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
-const upload = multer({ 
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} ${req.method} ${req.url}`);
+  next();
+});
+
+const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 50 * 1024 * 1024 }
 });
@@ -155,7 +184,7 @@ app.post('/api/documents/upload', upload.single('file'), async (req, res) => {
 
     const { originalname, mimetype, size, buffer } = req.file;
     console.log(`Processing upload: ${originalname} (${mimetype}, ${size} bytes)`);
-    
+
     let textContent = '';
     let pageCount = 1;
 
@@ -167,24 +196,24 @@ app.post('/api/documents/upload', upload.single('file'), async (req, res) => {
       } catch (pdfError) {
         console.error('PDF parsing error:', pdfError.message);
         if (pdfError.message && (pdfError.message.includes('password') || pdfError.message.includes('encrypted'))) {
-          return res.status(400).json({ 
-            error: 'PDF ini terproteksi password. Silakan buka proteksi PDF terlebih dahulu.' 
+          return res.status(400).json({
+            error: 'PDF ini terproteksi password. Silakan buka proteksi PDF terlebih dahulu.'
           });
         }
-        return res.status(400).json({ 
-          error: 'Gagal membaca PDF. Pastikan file tidak rusak atau corrupt.' 
+        return res.status(400).json({
+          error: 'Gagal membaca PDF. Pastikan file tidak rusak atau corrupt.'
         });
       }
-    } else if (mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 
-               mimetype === 'application/msword') {
+    } else if (mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      mimetype === 'application/msword') {
       try {
         const result = await mammoth.extractRawText({ buffer });
         textContent = result.value;
         console.log(`DOCX parsed: ${textContent.length} chars extracted`);
       } catch (docError) {
         console.error('DOCX parsing error:', docError.message);
-        return res.status(400).json({ 
-          error: 'Gagal membaca file Word. Pastikan file tidak rusak.' 
+        return res.status(400).json({
+          error: 'Gagal membaca file Word. Pastikan file tidak rusak.'
         });
       }
     } else if (mimetype === 'text/plain') {
@@ -197,16 +226,16 @@ app.post('/api/documents/upload', upload.single('file'), async (req, res) => {
     if (!textContent.trim()) {
       console.log('No text content extracted from file');
       if (mimetype === 'application/pdf') {
-        return res.status(400).json({ 
-          error: 'PDF ini tidak mengandung teks (kemungkinan hasil scan/gambar). Si Asef belum bisa membaca PDF hasil scan. Silakan gunakan PDF dengan teks yang bisa di-copy atau konversi dengan OCR terlebih dahulu.' 
+        return res.status(400).json({
+          error: 'PDF ini tidak mengandung teks (kemungkinan hasil scan/gambar). Si Asef belum bisa membaca PDF hasil scan. Silakan gunakan PDF dengan teks yang bisa di-copy atau konversi dengan OCR terlebih dahulu.'
         });
       }
       return res.status(400).json({ error: 'Tidak dapat mengekstrak teks dari file.' });
     }
 
-    const fileSize = size < 1024 ? `${size} B` : 
-                     size < 1024 * 1024 ? `${(size / 1024).toFixed(1)} KB` : 
-                     `${(size / (1024 * 1024)).toFixed(1)} MB`;
+    const fileSize = size < 1024 ? `${size} B` :
+      size < 1024 * 1024 ? `${(size / 1024).toFixed(1)} KB` :
+        `${(size / (1024 * 1024)).toFixed(1)} MB`;
 
     const folder = req.body.folder || 'Umum';
 
@@ -220,14 +249,14 @@ app.post('/api/documents/upload', upload.single('file'), async (req, res) => {
     );
 
     const chunks = chunkText(textContent, 1);
-    
+
     const BATCH_SIZE = 5;
     for (let batchStart = 0; batchStart < chunks.length; batchStart += BATCH_SIZE) {
       const batchChunks = chunks.slice(batchStart, batchStart + BATCH_SIZE);
       const texts = batchChunks.map(c => c.content);
-      
+
       const embeddings = await generateEmbeddingsBatch(texts);
-      
+
       for (let idx = 0; idx < batchChunks.length; idx++) {
         const chunk = batchChunks[idx];
         await insertChunk(
@@ -244,8 +273,8 @@ app.post('/api/documents/upload', upload.single('file'), async (req, res) => {
 
     await updateDocumentChunkCount(docId, chunks.length);
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       documentId: docId,
       fileName: originalname,
       chunks: chunks.length,
@@ -429,7 +458,7 @@ app.post('/api/users/upload-excel', upload.single('file'), async (req, res) => {
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
       if (!row || !row[nikIdx] || !row[namaIdx]) continue;
-      
+
       users.push({
         nik: row[nikIdx]?.toString().trim(),
         nama: row[namaIdx]?.toString().trim(),
@@ -444,8 +473,8 @@ app.post('/api/users/upload-excel', upload.single('file'), async (req, res) => {
     }
 
     const result = await bulkCreateUsers(users);
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       imported: result.length,
       message: `${result.length} user berhasil diimport`
     });
@@ -460,15 +489,15 @@ app.post('/api/login', async (req, res) => {
   try {
     const { nik, password } = req.body;
     const user = await getUserByNik(nik);
-    
+
     if (!user) {
       return res.status(401).json({ error: 'NIK tidak terdaftar' });
     }
-    
+
     if (user.password !== password) {
       return res.status(401).json({ error: 'Password salah' });
     }
-    
+
     res.json({
       success: true,
       user: {
@@ -486,13 +515,99 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
+app.post('/api/register-organization', async (req, res) => {
+  try {
+    const {
+      companyName,
+      industry,
+      adminName,
+      adminEmail,
+      adminPassword,
+      settings
+    } = req.body;
+
+    if (!companyName || !adminEmail || !adminPassword) {
+      return res.status(400).json({ error: 'Data pendaftaran tidak lengkap' });
+    }
+
+    const slug = slugify(companyName) + '-' + Math.random().toString(36).substring(2, 7);
+
+    // 1. Create Organization
+    const organization = await createOrganization(companyName, industry, slug, settings || {});
+
+    // 2. Create Admin User (using email as nik if nik not provided)
+    const adminUser = await createUser(
+      adminEmail,
+      adminName || 'Admin ' + companyName,
+      'Management',
+      'Administrator',
+      'admin',
+      organization.id,
+      adminPassword
+    );
+
+    res.json({
+      success: true,
+      organization,
+      user: {
+        id: adminUser.id,
+        nik: adminUser.nik,
+        nama: adminUser.nama,
+        departemen: adminUser.departemen,
+        jabatan: adminUser.jabatan,
+        role: adminUser.role
+      }
+    });
+
+  } catch (error) {
+    console.error('Registration error details:', {
+      message: error.message,
+      code: error.code,
+      constraint: error.constraint,
+      detail: error.detail,
+      stack: error.stack
+    });
+
+    // Handle specific database errors
+    if (error.code === '23505') { // Unique constraint violation
+      if (error.constraint?.includes('slug')) {
+        return res.status(400).json({
+          error: 'Nama perusahaan sudah terdaftar',
+          detail: 'Silakan gunakan nama perusahaan yang berbeda'
+        });
+      }
+      if (error.constraint?.includes('nik') || error.constraint?.includes('users')) {
+        return res.status(400).json({
+          error: 'Email admin sudah terdaftar',
+          detail: 'Email ini sudah digunakan oleh organisasi lain'
+        });
+      }
+      return res.status(400).json({ error: 'Data sudah terdaftar' });
+    }
+
+    // Handle connection errors
+    if (error.message?.includes('connect') || error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') {
+      return res.status(503).json({
+        error: 'Tidak dapat terhubung ke database',
+        detail: 'Silakan coba lagi dalam beberapa saat'
+      });
+    }
+
+    // Generic error with more info for debugging
+    res.status(500).json({
+      error: 'Registrasi gagal',
+      detail: process.env.NODE_ENV === 'development' ? error.message : 'Terjadi kesalahan server. Silakan coba lagi.'
+    });
+  }
+});
+
 app.post('/api/chat', async (req, res) => {
   try {
     const { message, sessionId } = req.body;
-    
+
     const openaiApiKey = process.env.OPENAI_API_KEY || process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
     const openaiBaseUrl = process.env.OPENAI_API_KEY ? undefined : process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
-    
+
     if (!openaiApiKey && !process.env.GEMINI_API_KEY) {
       return res.status(500).json({ error: 'API key not configured' });
     }
@@ -504,7 +619,7 @@ app.post('/api/chat', async (req, res) => {
     if (allChunks.length > 0) {
       const queryEmbedding = await generateEmbedding(message);
       const relevantChunks = await searchSimilarChunks(queryEmbedding, allChunks, 5);
-      
+
       if (relevantChunks.length > 0) {
         const ragResult = buildRAGPrompt(message, relevantChunks);
         augmentedPrompt = ragResult.prompt;
@@ -524,10 +639,10 @@ app.post('/api/chat', async (req, res) => {
         openaiConfig.baseURL = openaiBaseUrl;
       }
       const openai = new OpenAI(openaiConfig);
-      
+
       let chatHistory = chatSessions.get(sessionId) || [];
       chatHistory.push({ role: 'user', content: augmentedPrompt });
-      
+
       const stream = await openai.chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [
@@ -546,14 +661,14 @@ app.post('/api/chat', async (req, res) => {
           res.write(`data: ${JSON.stringify({ text })}\n\n`);
         }
       }
-      
+
       chatHistory.push({ role: 'assistant', content: fullResponse });
       chatSessions.set(sessionId, chatHistory);
     } else {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      
+
       let chatSession = chatSessions.get(sessionId);
-      
+
       if (!chatSession) {
         chatSession = await ai.chats.create({
           model: 'gemini-2.5-flash',
@@ -574,10 +689,10 @@ app.post('/api/chat', async (req, res) => {
         }
       }
     }
-    
+
     res.write('data: [DONE]\n\n');
     res.end();
-    
+
   } catch (error) {
     console.error('Chat error:', error);
     if (!res.headersSent) {
@@ -598,8 +713,8 @@ app.post('/api/chat/reset', (req, res) => {
 });
 
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
+  res.json({
+    status: 'ok',
     hasApiKey: !!process.env.GEMINI_API_KEY,
     hasDatabase: !!process.env.DATABASE_URL
   });
@@ -701,3 +816,10 @@ app.use((req, res, next) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
 });
+
+// Heartbeat to keep the event loop busy in some environments
+setInterval(() => {
+  if (process.env.DEBUG_HEARTBEAT) {
+    console.log(`${new Date().toISOString()} - Server Heartbeat`);
+  }
+}, 30000);

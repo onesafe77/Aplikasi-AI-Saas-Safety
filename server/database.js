@@ -4,9 +4,62 @@ const { Pool } = pg;
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  connectionTimeoutMillis: 10000, // 10 seconds
+  idleTimeoutMillis: 30000, // 30 seconds
+  max: 20, // max connections
+  ssl: process.env.DATABASE_URL?.includes('railway') || process.env.DATABASE_URL?.includes('aws') ? {
+    rejectUnauthorized: false
+  } : false
 });
 
+// Test database connection on startup
+pool.on('error', (err) => {
+  console.error('Unexpected database error:', err);
+});
+
+// Function to test connection
+export async function testConnection() {
+  try {
+    console.log('Attempting to connect to database...');
+    console.log('Database URL:', process.env.DATABASE_URL ? 'Set (hidden for security)' : 'NOT SET');
+
+    const client = await pool.connect();
+    console.log('✓ Connection established');
+
+    const result = await client.query('SELECT NOW() as current_time');
+    console.log('✓ Query executed successfully at', result.rows[0].current_time);
+
+    client.release();
+    console.log('✓ Database connected successfully');
+    return true;
+  } catch (error) {
+    console.error('✗ Database connection failed');
+    console.error('Error code:', error.code);
+    console.error('Error message:', error.message);
+
+    if (error.code === 'ENOTFOUND') {
+      console.error('→ DNS lookup failed. Check database host.');
+    } else if (error.code === 'ECONNREFUSED') {
+      console.error('→ Connection refused. Check if database is running.');
+    } else if (error.code === 'ETIMEDOUT') {
+      console.error('→ Connection timeout. Check network/firewall.');
+    } else if (error.message?.includes('password')) {
+      console.error('→ Authentication failed. Check credentials.');
+    } else if (error.message?.includes('SSL')) {
+      console.error('→ SSL error. Try adjusting SSL settings.');
+    }
+
+    return false;
+  }
+}
+
 export async function initDatabase() {
+  // Test connection first
+  const isConnected = await testConnection();
+  if (!isConnected) {
+    throw new Error('Failed to connect to database. Please check DATABASE_URL configuration.');
+  }
+
   const client = await pool.connect();
   try {
     await client.query(`
@@ -94,15 +147,55 @@ export async function initDatabase() {
     }
 
     await client.query(`
+      CREATE TABLE IF NOT EXISTS organizations (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        name VARCHAR(255) NOT NULL,
+        industry VARCHAR(100),
+        slug VARCHAR(100) UNIQUE,
+        subscription_status VARCHAR(50) DEFAULT 'active',
+        settings JSONB DEFAULT '{}',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Ensure users have organization_id
+    await client.query(`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS organization_id UUID REFERENCES organizations(id);
+    `);
+
+    // Ensure documents have organization_id and industry_tag
+    await client.query(`
+      ALTER TABLE documents ADD COLUMN IF NOT EXISTS organization_id UUID REFERENCES organizations(id);
+      ALTER TABLE documents ADD COLUMN IF NOT EXISTS industry_tag VARCHAR(100);
+    `);
+
+    // Ensure chunks have organization_id (for faster filtering)
+    await client.query(`
+      ALTER TABLE chunks ADD COLUMN IF NOT EXISTS organization_id UUID REFERENCES organizations(id);
+    `);
+
+    // Ensure folders have organization_id
+    await client.query(`
+      ALTER TABLE folders ADD COLUMN IF NOT EXISTS organization_id UUID REFERENCES organizations(id);
+    `);
+
+    // Ensure chat_sessions have organization_id
+    await client.query(`
+      ALTER TABLE chat_sessions ADD COLUMN IF NOT EXISTS organization_id UUID REFERENCES organizations(id);
+    `);
+
+    await client.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
-        nik VARCHAR(50) UNIQUE NOT NULL,
+        organization_id UUID REFERENCES organizations(id),
+        nik VARCHAR(50) NOT NULL,
         nama VARCHAR(255) NOT NULL,
         departemen VARCHAR(100),
         jabatan VARCHAR(100),
         password VARCHAR(255) DEFAULT '123456',
         role VARCHAR(20) DEFAULT 'user',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(organization_id, nik)
       );
     `);
 
@@ -295,10 +388,10 @@ export async function getAllUsers() {
   return result.rows;
 }
 
-export async function createUser(nik, nama, departemen, jabatan, role = 'user') {
+export async function createUser(nik, nama, departemen, jabatan, role = 'user', organizationId = null, password = '123456') {
   const result = await pool.query(
-    `INSERT INTO users (nik, nama, departemen, jabatan, role) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-    [nik, nama, departemen, jabatan, role]
+    `INSERT INTO users (nik, nama, departemen, jabatan, role, organization_id, password) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+    [nik, nama, departemen, jabatan, role, organizationId, password]
   );
   return result.rows[0];
 }
@@ -350,6 +443,15 @@ export async function bulkCreateUsers(users) {
   } finally {
     client.release();
   }
+}
+
+
+export async function createOrganization(name, industry, slug, settings = {}) {
+  const result = await pool.query(
+    `INSERT INTO organizations (name, industry, slug, settings) VALUES ($1, $2, $3, $4) RETURNING *`,
+    [name, industry, slug, JSON.stringify(settings)]
+  );
+  return result.rows[0];
 }
 
 export { pool };
